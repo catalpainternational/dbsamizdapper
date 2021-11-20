@@ -6,6 +6,8 @@ For specifics on integrating with the Django web framework, and some examples fo
 
 For discussions, questions, bug reports, feature requests, development, and engaging other users, use the [public mailinglist](https://lists.sr.ht/~nullenenenen/dbsamizdat-discuss).
 
+It requires Python 3.6 or later, and is tested for compatibility with PostgreSQL 9.6 and up.
+
 ## What it is
 
 DBSamizdat is a lightweight tool that manages code that lives in the database: **views**, **materialized views**, **functions** and **triggers**, and the dependencies between those and other DB objects.
