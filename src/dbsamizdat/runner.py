@@ -99,6 +99,7 @@ def cmd_sync(args):
             for sd in excess_dbstate:
                 yield 'drop', sd, sd.drop(if_exists=True)  # we don't know the deptree; so they may have vanished through a cascading drop of a previous object
         executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
+        issame, excess_dbstate, excess_definedstate = dbstate_equals_definedstate(cursor, samizdats)  # again, we don't know the in-db deptree, so we need to re-read DB state as the rug may have been pulled out from under us with cascading drops
     if excess_definedstate:
         def creates():
             to_create_ids = {sd.head_id() for sd in excess_definedstate}
