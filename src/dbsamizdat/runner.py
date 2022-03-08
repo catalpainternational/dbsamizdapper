@@ -159,6 +159,7 @@ def cmd_nuke(args, samizdats=None):
 def executor(yielder, args, cursor, max_namelen=0, timing=False):
 
     action_timer = timer()
+    next(action_timer)
 
     def progressprint(ix, action_totake, sd, sql):
         if args.verbosity:
