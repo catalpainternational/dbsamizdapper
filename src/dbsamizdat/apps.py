@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models.signals import pre_migrate, post_migrate
 from django.db.migrations import RunSQL, RunPython, AddField, RemoveField, RenameField, AlterField, DeleteModel, RenameModel, AlterModelTable
 from django.contrib.contenttypes.management import RenameContentType
+from django.core.management.color import color_style
 
 from .libgraph import unmanaged_refs, depsort_with_sidekicks, sanity_check, subtree_depends
 from .loader import get_samizdats
@@ -14,6 +15,7 @@ from .util import fqify_node
 
 DBCONN = 'default'  # Only migrations on the default DB connections are supported. For now.
 SMART_MIGRATIONS = getattr(settings, 'DBSAMIZDAT_SMART_MIGRATIONS', False)  # Don't use with custom Operations!
+style = color_style()
 
 
 def get_cmd_args(**kwargs):
@@ -104,10 +106,9 @@ def premigrate_handler(sender, **kwargs):
 
 
 def postmigrate_handler(sender, **kwargs):
-    if kwargs.get('plan') and kwargs['using'] == DBCONN:
-        # Stuff went down, we may have dropped some things, sync will figure it out
+    if kwargs['using'] == DBCONN:
         if kwargs.get('interactive'):
-            print("Syncing DBSamizdat:")
+            print(style.MIGRATE_HEADING("Syncing DBSamizdat:"))
         sync(**kwargs)
 
 
