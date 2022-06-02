@@ -12,7 +12,6 @@ _CMD_ARG_DEFAULTS = dict(
     in_django=True,
     verbosity=1,
     log_rather_than_print=True,
-    samizdatmodules=tuple(),
 )
 
 
