@@ -4,8 +4,6 @@ from enum import Enum
 from logging import getLogger
 from time import monotonic
 
-import psycopg2
-
 from . import entitypes
 from .exceptions import (DatabaseError, FunctionSignatureError,
                          SamizdatException)
@@ -57,7 +55,12 @@ def get_cursor(args):
 
         cursor = connections[args.dbconn].cursor().cursor
     else:
-        cursor = psycopg2.connect(args.dburl).cursor()
+        try:
+            import psycopg
+        except ImportError as E:
+            raise ImportError("Running standalone requires psycopg") from E
+
+        cursor = psycopg.connect(args.dburl).cursor()
     cursor.execute("BEGIN;")  # And so it begins…
     return cursor
 
@@ -239,7 +242,7 @@ def executor(yielder, args, cursor, max_namelen=0, timing=False):
                 cursor.execute("BEGIN;")  # harmless if already in a tx
                 cursor.execute(f"SAVEPOINT action_{action_totake};")
                 cursor.execute(sql)
-            except psycopg2.errors.UndefinedFunction as ouch:
+            except Exception as ouch:
                 if action_totake == "sign":
                     cursor.execute(
                         f"ROLLBACK TO SAVEPOINT action_{action_totake};"
@@ -255,7 +258,7 @@ def executor(yielder, args, cursor, max_namelen=0, timing=False):
                     ]
                     raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
-        except psycopg2.Error as dberr:
+        except Exception as dberr:
             raise DatabaseError(f"{action_totake} failed", dberr, sd, sql)
         cursor.execute(f"RELEASE SAVEPOINT action_{action_totake};")
         if args.txdiscipline == txstyle.CHECKPOINT.value and action_totake != "create":

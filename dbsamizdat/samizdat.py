@@ -175,7 +175,7 @@ class Samizdat(ABC):
     def sign(cls, cursor):
         """
         Generate COMMENT ON sql storing a signature
-        We need the cursor to let psycopg2 properly escape our json-as-text-string.
+        We need the cursor to let psycopg (2) properly escape our json-as-text-string.
         """
         return cursor.mogrify(
             """COMMENT ON {cls.entity_type.value} {cls.db_object_identity} IS %s;""".format(
