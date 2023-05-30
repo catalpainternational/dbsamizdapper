@@ -3,6 +3,8 @@ import sys
 from enum import Enum
 from logging import getLogger
 from time import monotonic
+from typing import Generator
+import typing
 
 from . import entitypes
 from .exceptions import (DatabaseError, FunctionSignatureError,
@@ -15,6 +17,9 @@ from .libgraph import (depsort_with_sidekicks, node_dump, sanity_check,
 from .loader import get_samizdats
 from .util import fqify_node, nodenamefmt, sqlfmt
 
+if typing.TYPE_CHECKING:
+    from psycopg import Cursor
+    from psycopg.rows import Row
 
 class txstyle(Enum):
     CHECKPOINT = "checkpoint"
@@ -26,7 +31,10 @@ logger = getLogger(__name__)
 PRINTKWARGS = dict(file=sys.stderr, flush=True)
 
 
-def timer():
+def timer() -> Generator[float, None, None]:
+    """
+    Generator to show time elapsed since the last iteration
+    """
     last = monotonic()
     while True:
         cur = monotonic()
@@ -38,17 +46,22 @@ def vprint(args: argparse.Namespace, *pargs, **pkwargs):
     if args.log_rather_than_print:
         logger.info(" ".join(map(str, pargs)))
     elif args.verbosity:
-        print(*pargs, **{**PRINTKWARGS, **pkwargs})
+        print(*pargs)
+        print({**PRINTKWARGS, **pkwargs})
 
 
 def vvprint(args: argparse.Namespace, *pargs, **pkwargs):
     if args.log_rather_than_print:
         logger.debug(" ".join(map(str, pargs)))
     elif args.verbosity > 1:
-        print(*pargs, **{**PRINTKWARGS, **pkwargs})
+        print(*pargs)
+        print({**PRINTKWARGS, **pkwargs})
 
 
-def get_cursor(args):
+def get_cursor(args) -> Cursor[Row]:
+    """
+    Returns a psycopg or Django cursor
+    """
     cursor = None
     if args.in_django:
         from django.db import connections
@@ -56,7 +69,7 @@ def get_cursor(args):
         cursor = connections[args.dbconn].cursor().cursor
     else:
         try:
-            import psycopg
+            import psycopg  # noqa: F811
         except ImportError as E:
             raise ImportError("Running standalone requires psycopg") from E
 
