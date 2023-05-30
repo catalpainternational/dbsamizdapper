@@ -1,9 +1,10 @@
+from enum import IntFlag
+from itertools import chain
 from json import loads as jsonloads
 from typing import Iterable
-from itertools import chain
-from enum import IntFlag
 
-from . import entitypes, SamizdatView, SamizdatMaterializedView, SamizdatFunction, SamizdatTrigger
+from . import (SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger,
+               SamizdatView, entitypes)
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
 
@@ -13,7 +14,16 @@ class DBObjectType(IntFlag):
     FOREIGN = 2
 
 
-def get_dbstate(cursor, which: DBObjectType = DBObjectType.SAMIZDAT, entity_types: Iterable[entitypes] = (entitypes.VIEW, entitypes.MATVIEW, entitypes.FUNCTION, entitypes.TRIGGER)):
+def get_dbstate(
+    cursor,
+    which: DBObjectType = DBObjectType.SAMIZDAT,
+    entity_types: Iterable[entitypes] = (
+        entitypes.VIEW,
+        entitypes.MATVIEW,
+        entitypes.FUNCTION,
+        entitypes.TRIGGER,
+    ),
+):
     """
     Capture and annotate the current DB state (functions, views and triggers)
     """
@@ -23,7 +33,11 @@ def get_dbstate(cursor, which: DBObjectType = DBObjectType.SAMIZDAT, entity_type
         return cursor.fetchall()
 
     pg11_or_lower = cursor.connection.server_version < 110000
-    function_filter = "NOT (p.proisagg OR p.proiswindow OR p.prosecdef)" if pg11_or_lower else "p.prokind NOT IN ('a', 'w', 'p')"
+    function_filter = (
+        "NOT (p.proisagg OR p.proiswindow OR p.prosecdef)"
+        if pg11_or_lower
+        else "p.prokind NOT IN ('a', 'w', 'p')"
+    )
 
     fetches = {
         entitypes.VIEW: """
@@ -75,16 +89,22 @@ def get_dbstate(cursor, which: DBObjectType = DBObjectType.SAMIZDAT, entity_type
                 LEFT JOIN pg_catalog.pg_namespace pn ON pn.oid = pc.relnamespace
             WHERE
                 pt.tgisinternal = False
-            """
+            """,
     }
 
     for *stuff, jinfo in chain(*map(execfetch, map(fetches.get, entity_types))):
-        objtype = DBObjectType.SAMIZDAT if (jinfo and jinfo.startswith(COMMENT_MAGIC)) else DBObjectType.FOREIGN
+        objtype = (
+            DBObjectType.SAMIZDAT
+            if (jinfo and jinfo.startswith(COMMENT_MAGIC))
+            else DBObjectType.FOREIGN
+        )
         if objtype & which:
             definition_hash = None
             if objtype == DBObjectType.SAMIZDAT:
-                meta = jsonloads(jinfo)['dbsamizdat']
-                hashattr = {0: 'sql_template_hash', 1: 'definition_hash'}[meta['version']]
+                meta = jsonloads(jinfo)["dbsamizdat"]
+                hashattr = {0: "sql_template_hash", 1: "definition_hash"}[
+                    meta["version"]
+                ]
                 definition_hash = meta[hashattr]
             yield tuple(stuff + [definition_hash])
 
@@ -93,7 +113,15 @@ def dbinfo_to_class(dbstate_info):
     """
     Reconstruct a class out of information found in the DB
     """
-    typemap = {c.entity_type: c for c in (SamizdatView, SamizdatMaterializedView, SamizdatFunction, SamizdatTrigger)}
+    typemap = {
+        c.entity_type: c
+        for c in (
+            SamizdatView,
+            SamizdatMaterializedView,
+            SamizdatFunction,
+            SamizdatTrigger,
+        )
+    }
     schema, objectname, objecttype, *maybe_args, definition_hash = dbstate_info
     entity_type = entitypes[objecttype]
     classfields = dict(
@@ -101,15 +129,19 @@ def dbinfo_to_class(dbstate_info):
         implanted_hash=definition_hash,
     )
     if entity_type == entitypes.FUNCTION:
-        classfields.update(dict(
-            function_arguments_signature=maybe_args[0],
-            function_name=objectname,
-        ))
+        classfields.update(
+            dict(
+                function_arguments_signature=maybe_args[0],
+                function_name=objectname,
+            )
+        )
     elif entity_type == entitypes.TRIGGER:
-        classfields.update(dict(
-            schema=None,
-            on_table=(schema, maybe_args[0]),
-        ))
+        classfields.update(
+            dict(
+                schema=None,
+                on_table=(schema, maybe_args[0]),
+            )
+        )
 
     return type(objectname, (typemap[entitypes[objecttype]],), classfields)
 
@@ -120,5 +152,5 @@ def dbstate_equals_definedstate(cursor, samizdats):
     return (
         dbstate.keys() == definedstate.keys(),
         {dbstate[k] for k in dbstate.keys() - definedstate.keys()},
-        {definedstate[k] for k in definedstate.keys() - dbstate.keys()}
+        {definedstate[k] for k in definedstate.keys() - dbstate.keys()},
     )

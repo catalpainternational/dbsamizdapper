@@ -9,8 +9,8 @@ class SamizdatException(Exception):
         self.samizdat = samizdat
 
     def __str__(self):
-        sd_subject = f'{repr(self.samizdat)} : ' if self.samizdat else ''
-        return f'{sd_subject}{self.message}'
+        sd_subject = f"{repr(self.samizdat)} : " if self.samizdat else ""
+        return f"{sd_subject}{self.message}"
 
 
 class NameClashError(SamizdatException):
@@ -37,7 +37,7 @@ class DatabaseError(SamizdatException):
         self.sql = sql
 
     def __str__(self):
-        return f'''
+        return f"""
             While executing:
             {sqlfmt(self.sql)}
 
@@ -49,7 +49,7 @@ class DatabaseError(SamizdatException):
 
             furthermore:
             {self.message}
-            '''
+            """
 
 
 class DependencyCycleError(SamizdatException):
@@ -58,8 +58,8 @@ class DependencyCycleError(SamizdatException):
         self.samizdats = samizdats
 
     def __str__(self):
-        sd_subjects = ', '.join(self.samizdats)
-        return f'{sd_subjects} : {self.message}'
+        sd_subjects = ", ".join(self.samizdats)
+        return f"{sd_subjects} : {self.message}"
 
 
 class FunctionSignatureError(SamizdatException):
@@ -69,9 +69,13 @@ class FunctionSignatureError(SamizdatException):
 
     def __str__(self):
         sd_subject = repr(self.samizdat)
-        candidate_args = '\n'.join(self.candidate_arguments)
-        args_herald = f"the following candidates:\n{candidate_args}" if len(self.candidate_arguments) > 1 else f'"{candidate_args}"'
-        return f'''
+        candidate_args = "\n".join(self.candidate_arguments)
+        args_herald = (
+            f"the following candidates:\n{candidate_args}"
+            if len(self.candidate_arguments) > 1
+            else f'"{candidate_args}"'
+        )
+        return f"""
             After executing:
             {sqlfmt(self.samizdat.create())}
 
@@ -88,4 +92,4 @@ class FunctionSignatureError(SamizdatException):
             {args_herald}
 
             HINT: Amend the {sd_subject} .function_arguments_signature and/or .function_arguments attributes.
-            For more information, consult the README.'''
+            For more information, consult the README."""

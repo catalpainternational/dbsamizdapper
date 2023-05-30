@@ -1,5 +1,5 @@
-from dbsamizdat import SamizdatView, SamizdatMaterializedView, SamizdatFunction, SamizdatTrigger
-
+from dbsamizdat import (SamizdatFunction, SamizdatMaterializedView,
+                        SamizdatTrigger, SamizdatView)
 
 fruittable_SQL = """
     CREATE TABLE "Fruit" (
@@ -37,7 +37,7 @@ fruittable_SQL = """
 
 
 class DealFruitView(SamizdatView):
-    deps_on_unmanaged = {('public', 'Fruit')}
+    deps_on_unmanaged = {("public", "Fruit")}
     sql_template = """
         ${preamble}
         SELECT name FROM "public"."Fruit" ORDER BY random() LIMIT 1;
@@ -60,8 +60,8 @@ class DealFruitFun(SamizdatFunction):
 
 class DealFruitFunWithName(SamizdatFunction):
     deps_on = {DealFruitFun}
-    function_name = 'DealFruitFun'
-    function_arguments_signature = 'name text'
+    function_name = "DealFruitFun"
+    function_arguments_signature = "name text"
     sql_template = f"""
         ${{preamble}}
         RETURNS text AS
@@ -74,9 +74,9 @@ class DealFruitFunWithName(SamizdatFunction):
 
 
 class Treat(SamizdatMaterializedView):
-    deps_on_unmanaged = {('public', 'Pet')}
+    deps_on_unmanaged = {("public", "Pet")}
     deps_on = {DealFruitFunWithName}
-    refresh_triggers = {('public', 'Pet'), ('public', 'Fruit')}
+    refresh_triggers = {("public", "Pet"), ("public", "Fruit")}
     sql_template = f"""
         ${{preamble}}
         SELECT "{DealFruitFunWithName.name}"(name) AS treat FROM "public"."Pet"
@@ -86,7 +86,7 @@ class Treat(SamizdatMaterializedView):
 
 class PetUppercase(SamizdatMaterializedView):
     refresh_concurrently = True
-    deps_on_unmanaged = {('public', 'Pet')}
+    deps_on_unmanaged = {("public", "Pet")}
     sql_template = """
         ${preamble}
         SELECT id, upper(name) FROM "public"."Pet"

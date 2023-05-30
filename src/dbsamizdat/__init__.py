@@ -1,3 +1,4 @@
-from .samizdat import entitypes, SamizdatView, SamizdatMaterializedView, SamizdatFunction, SamizdatTrigger  # noqa F401
+from .samizdat import (SamizdatFunction, SamizdatMaterializedView,  # noqa F401
+                       SamizdatTrigger, SamizdatView, entitypes)
 
-default_app_config = 'dbsamizdat.apps.DBSamizdatConfig'  # For Django < 4.0
+default_app_config = "dbsamizdat.apps.DBSamizdatConfig"  # For Django < 4.0

@@ -5,7 +5,10 @@ API for using dbsamizdat as a library
 from argparse import Namespace as _Namespace
 from typing import Iterable, Union
 
-from .runner import cmd_refresh as _cmd_refresh, cmd_sync as _cmd_sync, cmd_nuke as _cmd_nuke, txstyle
+from .runner import cmd_nuke as _cmd_nuke
+from .runner import cmd_refresh as _cmd_refresh
+from .runner import cmd_sync as _cmd_sync
+from .runner import txstyle
 from .samizdat import Samizdat
 
 _CMD_ARG_DEFAULTS = dict(
@@ -15,7 +18,12 @@ _CMD_ARG_DEFAULTS = dict(
 )
 
 
-def refresh(dburl: str, samizdatmodules: Iterable[str], transaction_style: txstyle = txstyle.JUMBO, belownodes: Iterable[Union[str, tuple, Samizdat]] = tuple()):
+def refresh(
+    dburl: str,
+    samizdatmodules: Iterable[str],
+    transaction_style: txstyle = txstyle.JUMBO,
+    belownodes: Iterable[Union[str, tuple, Samizdat]] = tuple(),
+):
     """Refresh materialized views, in dependency order, optionally restricted to views depending directly or transitively on any of the DB objects specified in `belownodes`."""
     args = _Namespace(
         **_CMD_ARG_DEFAULTS,
@@ -27,7 +35,11 @@ def refresh(dburl: str, samizdatmodules: Iterable[str], transaction_style: txsty
     _cmd_refresh(args)
 
 
-def sync(dburl: str, samizdatmodules: Iterable[str], transaction_style: txstyle = txstyle.JUMBO):
+def sync(
+    dburl: str,
+    samizdatmodules: Iterable[str],
+    transaction_style: txstyle = txstyle.JUMBO,
+):
     """Sync dbsamizdat state to the DB."""
     args = _Namespace(
         **_CMD_ARG_DEFAULTS,

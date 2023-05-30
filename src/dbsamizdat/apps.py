@@ -2,31 +2,38 @@ from argparse import Namespace
 
 from django.apps import AppConfig
 from django.conf import settings
-from django.db.models.signals import pre_migrate, post_migrate
-from django.db.migrations import RunSQL, RunPython, AddField, RemoveField, RenameField, AlterField, DeleteModel, RenameModel, AlterModelTable
 from django.contrib.contenttypes.management import RenameContentType
 from django.core.management.color import color_style
+from django.db.migrations import (AddField, AlterField, AlterModelTable,
+                                  DeleteModel, RemoveField, RenameField,
+                                  RenameModel, RunPython, RunSQL)
+from django.db.models.signals import post_migrate, pre_migrate
 
-from .libgraph import unmanaged_refs, depsort_with_sidekicks, sanity_check, subtree_depends
-from .loader import get_samizdats
-from .runner import cmd_sync, cmd_nuke, txstyle, get_cursor
 from .libdb import dbstate_equals_definedstate
+from .libgraph import (depsort_with_sidekicks, sanity_check, subtree_depends,
+                       unmanaged_refs)
+from .loader import get_samizdats
+from .runner import cmd_nuke, cmd_sync, get_cursor, txstyle
 from .util import fqify_node
 
-DBCONN = 'default'  # Only migrations on the default DB connections are supported. For now.
-SMART_MIGRATIONS = getattr(settings, 'DBSAMIZDAT_SMART_MIGRATIONS', False)  # Don't use with custom Operations!
+DBCONN = (
+    "default"  # Only migrations on the default DB connections are supported. For now.
+)
+SMART_MIGRATIONS = getattr(
+    settings, "DBSAMIZDAT_SMART_MIGRATIONS", False
+)  # Don't use with custom Operations!
 style = color_style()
 
 
 def get_cmd_args(**kwargs):
     return Namespace(
         printprogress=True,
-        verbosity=kwargs['verbosity'],
+        verbosity=kwargs["verbosity"],
         dbconn=DBCONN,
         txdiscipline=txstyle.JUMBO.value,
         in_django=True,
         samizdatmodules=tuple(),
-        log_rather_than_print=not kwargs.get('interactive'),
+        log_rather_than_print=not kwargs.get("interactive"),
     )
 
 
@@ -56,7 +63,10 @@ def tables_affected_by(apps, plan):
     tables_affected = set()
     for mig, reverse in plan:
         if reverse:
-            return (True, tables_affected)  # Too hard to think about, not too common, just nuke & recreate
+            return (
+                True,
+                tables_affected,
+            )  # Too hard to think about, not too common, just nuke & recreate
         for operation in mig.operations:
             if isinstance(operation, RenameContentType):
                 break  # sidekick operation of RenameModel, which we've already handled
@@ -65,18 +75,36 @@ def tables_affected_by(apps, plan):
                 # No sense in analyzing any other migrations then, either; return early.
                 return (True, tables_affected)
             try:
-                model_meta = apps.get_model(mig.app_label, getattr(operation, 'model_name', getattr(operation, 'old_name', getattr(operation, 'name'))))._meta
+                model_meta = apps.get_model(
+                    mig.app_label,
+                    getattr(
+                        operation,
+                        "model_name",
+                        getattr(operation, "old_name", getattr(operation, "name")),
+                    ),
+                )._meta
             except (AttributeError, LookupError):
                 break
             if not model_meta.managed:
                 break  # as then the migration will not actually do anything
-            if isinstance(operation, (AddField, RemoveField, RenameField, AlterField, DeleteModel, RenameModel, AlterModelTable)):
+            if isinstance(
+                operation,
+                (
+                    AddField,
+                    RemoveField,
+                    RenameField,
+                    AlterField,
+                    DeleteModel,
+                    RenameModel,
+                    AlterModelTable,
+                ),
+            ):
                 tables_affected.add(fqify_node(model_meta.db_table))
     return (False, tables_affected)
 
 
 def premigrate_handler(sender, **kwargs):
-    if not (kwargs.get('plan')) or (kwargs['using'] != DBCONN):
+    if not (kwargs.get("plan")) or (kwargs["using"] != DBCONN):
         return
 
     if not SMART_MIGRATIONS:
@@ -95,7 +123,7 @@ def premigrate_handler(sender, **kwargs):
         nuke(**kwargs)
         return
 
-    needs_wipe, tables_affected = tables_affected_by(kwargs['apps'], kwargs['plan'])
+    needs_wipe, tables_affected = tables_affected_by(kwargs["apps"], kwargs["plan"])
     if needs_wipe:
         nuke(**kwargs)
         return
@@ -106,14 +134,14 @@ def premigrate_handler(sender, **kwargs):
 
 
 def postmigrate_handler(sender, **kwargs):
-    if kwargs['using'] == DBCONN:
-        if kwargs.get('interactive'):
+    if kwargs["using"] == DBCONN:
+        if kwargs.get("interactive"):
             print(style.MIGRATE_HEADING("Syncing DBSamizdat:"))
         sync(**kwargs)
 
 
 class DBSamizdatConfig(AppConfig):
-    name = 'dbsamizdat'
+    name = "dbsamizdat"
 
     def ready(self):
         pre_migrate.connect(premigrate_handler, sender=self)
