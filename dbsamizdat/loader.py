@@ -1,74 +1,35 @@
-import inspect
-from importlib import import_module
-from itertools import chain
 from logging import getLogger
 
-from .samizdat import (SamizdatFunction, SamizdatFunctionMeta,
-                       SamizdatMaterializedView, SamizdatMeta, SamizdatTrigger,
-                       SamizdatTriggerMeta, SamizdatView)
+from dbsamizdat.samizdat import (
+    Samizdat,
+    SamizdatFunction,
+    SamizdatMaterializedView,
+    SamizdatTrigger,
+    SamizdatView,
+)
 
 logger = getLogger(__name__)
 
 AUTOLOAD_MODULENAME = "dbsamizdat_defs"
 
 
-def get_samizdats(modulelist=None, only_that_modulelist=False):
-    def issamizdat(thing):
-        excluded_classes = {
-            SamizdatView,
-            SamizdatMaterializedView,
-            SamizdatFunction,
-            SamizdatTrigger,
-        }
-        return (
-            inspect.isclass(thing)
-            and isinstance(
-                thing, (SamizdatMeta, SamizdatFunctionMeta, SamizdatTriggerMeta)
-            )
-            and (thing not in excluded_classes)
+def get_samizdats() -> set[Samizdat]:
+    """
+    Returns all subclasses of "Samizdat"
+    where they are not considered "abstract"
+    """
+
+    def all_subclasses(cls):
+        return set(cls.__subclasses__()).union(
+            [s for c in cls.__subclasses__() for s in all_subclasses(c)]
         )
 
-    sdmodules = [import_module(sdmod) for sdmod in (modulelist or [])]
-    if not only_that_modulelist:
-        try:
-            # if we're running in Django, we can try to autoload things
-            from django.apps import apps
-            from django.conf import settings
-            from django.core.exceptions import ImproperlyConfigured
-        except ImportError:
-            pass  # no Django
-        else:
-            try:
-                django_sdmodules = [
-                    import_module(sdmod)
-                    for sdmod in getattr(settings, "DBSAMIZDAT_MODULES", [])
-                ]
-                for appconfig in apps.get_app_configs():
-                    try:
-                        django_sdmodules.append(
-                            import_module(
-                                "{}.{}".format(
-                                    appconfig.module.__package__, AUTOLOAD_MODULENAME
-                                )
-                            )
-                        )
-                    except ImportError as err:
-                        if not err.msg.endswith(f"{AUTOLOAD_MODULENAME}'"):
-                            raise err
-                if not django_sdmodules:
-                    logger.warn(
-                        """No settings.DBSAMIZDAT_MODULES defined, and none of your apps contain any "dbsamizdat_defs" module to autoload."""
-                    )
-                sdmodules += django_sdmodules
-            except ImproperlyConfigured:
-                # assume we're not running in a fully booted Django
-                pass
+    excludelist = {
+        Samizdat,
+        SamizdatFunction,
+        SamizdatView,
+        SamizdatMaterializedView,
+        SamizdatTrigger,
+    }
 
-    return set(
-        (
-            c
-            for cname, c in chain(
-                *map(lambda m: inspect.getmembers(m, issamizdat), sdmodules)
-            )
-        )
-    )
+    return all_subclasses(Samizdat).difference(excludelist)

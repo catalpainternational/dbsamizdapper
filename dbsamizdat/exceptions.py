@@ -1,6 +1,8 @@
 from typing import List
 
-from .util import sqlfmt
+
+def sqlfmt(sql: str):
+    return "\n".join(("\t\t" + line for line in sql.splitlines()))
 
 
 class SamizdatException(Exception):

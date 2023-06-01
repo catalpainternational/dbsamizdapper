@@ -1,10 +1,21 @@
 from enum import IntFlag
-from itertools import chain
 from json import loads as jsonloads
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable, NamedTuple, Type
+import warnings
 
-from . import (SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger,
-               SamizdatView, entitypes)
+from .samtypes import ProtoSamizdat, entitypes
+
+if TYPE_CHECKING:
+    from psycopg import ClientCursor
+
+from dbsamizdat.samizdat import Samizdat
+
+from . import (
+    SamizdatFunction,
+    SamizdatMaterializedView,
+    SamizdatTrigger,
+    SamizdatView,
+)
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
 
@@ -14,37 +25,40 @@ class DBObjectType(IntFlag):
     FOREIGN = 2
 
 
+name = str
+hash_ = str
+
+
+class StateTuple(NamedTuple):
+    schemaname: str
+    viewname: str
+    objecttype: str
+    commentcontent: str
+    args: str | None
+    definition_hash: str | None
+
+
 def get_dbstate(
-    cursor,
-    which: DBObjectType = DBObjectType.SAMIZDAT,
-    entity_types: Iterable[entitypes] = (
-        entitypes.VIEW,
-        entitypes.MATVIEW,
-        entitypes.FUNCTION,
-        entitypes.TRIGGER,
-    ),
-):
+    cursor: "ClientCursor",
+) -> Iterable[StateTuple]:
     """
     Capture and annotate the current DB state (functions, views and triggers)
+    Identifies DBSamizdat managed objects based on their "comment".
+    Returns the schema; function / view / object name; "type"; and
+    comment embedded in the hash
+    "Functions" also include parameters
     """
 
-    def execfetch(sql):
-        cursor.execute(sql)
-        return cursor.fetchall()
-
-    pg11_or_lower = cursor.connection.server_version < 110000
-    function_filter = (
-        "NOT (p.proisagg OR p.proiswindow OR p.prosecdef)"
-        if pg11_or_lower
-        else "p.prokind NOT IN ('a', 'w', 'p')"
-    )
+    function_filter = "p.prokind NOT IN ('a', 'w', 'p')"
 
     fetches = {
         entitypes.VIEW: """
             SELECT n.nspname AS schemaname,
                 c.relname AS viewname,
-                'VIEW' as viewtype,
-                pg_catalog.obj_description(c.oid, 'pg_class') AS commentcontent
+                'VIEW' as objecttype,
+                pg_catalog.obj_description(c.oid, 'pg_class') AS commentcontent,
+                NULL as args,
+                NULL as definition_hash
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             WHERE c.relkind = 'v'
@@ -53,10 +67,12 @@ def get_dbstate(
                 AND n.nspname !~ '^pg_toast'
             """,
         entitypes.MATVIEW: """
-            SELECT n.nspname AS schemaname,
-                c.relname AS viewname,
-                'MATVIEW' as viewtype,
-                pg_catalog.obj_description(c.oid, 'pg_class') AS commentcontent
+            SELECT n.nspname,
+                c.relname,
+                'MATVIEW',
+                pg_catalog.obj_description(c.oid, 'pg_class') AS commentcontent,
+                NULL as args,
+                NULL as definition_hash
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             WHERE c.relkind = 'm'
@@ -65,11 +81,12 @@ def get_dbstate(
                 AND n.nspname !~ '^pg_toast'
             """,
         entitypes.FUNCTION: f"""
-            SELECT n.nspname AS "schemaname",
-                p.proname AS "functionname",
+            SELECT n.nspname,
+                p.proname,
                 'FUNCTION',
+                pg_catalog.obj_description(p.oid, 'pg_proc'),
                 pg_catalog.pg_get_function_identity_arguments(p.oid) AS args,
-                pg_catalog.obj_description(p.oid, 'pg_proc') AS commentcontent
+                NULL as definition_hash
             FROM pg_catalog.pg_proc p
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
             WHERE {function_filter}
@@ -78,11 +95,12 @@ def get_dbstate(
             """,
         entitypes.TRIGGER: """
             SELECT
-                pn.nspname AS schemaname,
-                pt.tgname AS triggername,
+                pn.nspname,
+                pt.tgname,
                 'TRIGGER',
-                pc.relname AS tablename,
-                pg_catalog.obj_description(pt.oid, 'pg_trigger') AS commentcontent
+                pg_catalog.obj_description(pt.oid, 'pg_trigger') AS commentcontent,
+                pc.relname,
+                NULL as definition_hash
             FROM
                 pg_trigger pt
                 LEFT JOIN pg_class pc ON pt.tgrelid = pc.oid
@@ -92,24 +110,29 @@ def get_dbstate(
             """,
     }
 
-    for *stuff, jinfo in chain(*map(execfetch, map(fetches.get, entity_types))):
-        objtype = (
-            DBObjectType.SAMIZDAT
-            if (jinfo and jinfo.startswith(COMMENT_MAGIC))
-            else DBObjectType.FOREIGN
-        )
-        if objtype & which:
-            definition_hash = None
-            if objtype == DBObjectType.SAMIZDAT:
-                meta = jsonloads(jinfo)["dbsamizdat"]
-                hashattr = {0: "sql_template_hash", 1: "definition_hash"}[
-                    meta["version"]
-                ]
-                definition_hash = meta[hashattr]
-            yield tuple(stuff + [definition_hash])
+    for fetch_query in fetches.values():
+        cursor.execute(fetch_query)
+        items = (StateTuple(*c) for c in cursor.fetchall())
+        # Comment is the last item in the query
+        for item in items:
+            if not (
+                item.commentcontent and item.commentcontent.startswith(COMMENT_MAGIC)
+            ):
+                continue
+            try:
+                meta = jsonloads(item.commentcontent)["dbsamizdat"]
+                # This is probably? a DBSamizdat
+                # Get the hash value from the comment
+                hashattr = (
+                    "sql_template_hash" if meta["version"] == 0 else "definition_hash"
+                )
+                yield item._replace(definition_hash=meta[hashattr])
+            except Exception as E:
+                warnings.warn(f"{E}")
+                continue
 
 
-def dbinfo_to_class(dbstate_info):
+def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
     """
     Reconstruct a class out of information found in the DB
     """
@@ -122,35 +145,56 @@ def dbinfo_to_class(dbstate_info):
             SamizdatTrigger,
         )
     }
-    schema, objectname, objecttype, *maybe_args, definition_hash = dbstate_info
-    entity_type = entitypes[objecttype]
-    classfields = dict(
-        schema=schema,
-        implanted_hash=definition_hash,
+
+    entity_type = entitypes[info.objecttype]
+    classfields: dict[str, None | str | tuple[str, str]] = dict(
+        schema=info.schemaname,
+        implanted_hash=str(info.definition_hash),
     )
     if entity_type == entitypes.FUNCTION:
         classfields.update(
             dict(
-                function_arguments_signature=maybe_args[0],
-                function_name=objectname,
+                function_arguments_signature=str(info.args),
+                function_name=info.viewname,
             )
         )
     elif entity_type == entitypes.TRIGGER:
+        table = str(info.args)
         classfields.update(
             dict(
                 schema=None,
-                on_table=(schema, maybe_args[0]),
+                on_table=(info.schemaname, table),
             )
         )
+    klass: type[Samizdat] = type(
+        info.viewname, (typemap[entitypes[info.objecttype]],), classfields
+    )
+    return klass
 
-    return type(objectname, (typemap[entitypes[objecttype]],), classfields)
+
+class DBComparison(NamedTuple):
+    issame: bool
+    excess_dbstate: Iterable[Type[ProtoSamizdat]]
+    excess_definedstate: Iterable[Samizdat]
 
 
-def dbstate_equals_definedstate(cursor, samizdats):
-    dbstate = {ds.head_id(): ds for ds in map(dbinfo_to_class, get_dbstate(cursor))}
+def dbstate_equals_definedstate(cursor: "ClientCursor", samizdats: Iterable[Samizdat]):
+    """
+    Returns whether there are id's to add or remove and if so which
+    samizdat classes (by id) need to be added or removed to sync database
+    """
+
+    current_state = get_dbstate(cursor)
+    state_to_classes = (dbinfo_to_class(s) for s in current_state)
+
+    dbstate = {ds.head_id(): ds for ds in state_to_classes}
     definedstate = {ds.head_id(): ds for ds in samizdats}
-    return (
-        dbstate.keys() == definedstate.keys(),
-        {dbstate[k] for k in dbstate.keys() - definedstate.keys()},
-        {definedstate[k] for k in definedstate.keys() - dbstate.keys()},
+
+    db_keys = dbstate.keys()
+    defined_keys = definedstate.keys()
+
+    return DBComparison(
+        issame=db_keys == defined_keys,
+        excess_dbstate={dbstate[k] for k in db_keys - defined_keys},
+        excess_definedstate={definedstate[k] for k in defined_keys - db_keys},
     )

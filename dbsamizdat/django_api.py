@@ -2,9 +2,9 @@
 API for using dbsamizdat as a library in Django
 """
 
-from argparse import Namespace as _Namespace
 from typing import Iterable, Union
 
+from .runner import ArgType
 from .runner import cmd_nuke as _cmd_nuke
 from .runner import cmd_refresh as _cmd_refresh
 from .runner import cmd_sync as _cmd_sync
@@ -24,8 +24,8 @@ def refresh(
     belownodes: Iterable[Union[str, tuple, Samizdat]] = tuple(),
     samizdatmodules=tuple(),
 ):
-    """Refresh materialized views, in dependency order, optionally restricted to views depending directly or transitively on any of the DB objects specified in `belownodes`."""
-    args = _Namespace(
+    """Refresh materialized views, in dependency order, optionally restricted to views depending directly or transitively on any of the DB objects specified in `belownodes`."""  # noqa: E501
+    args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dbconn=dbconn,
         txdiscipline=transaction_style.value,
@@ -41,7 +41,7 @@ def sync(
     samizdatmodules=tuple(),
 ):
     """Sync dbsamizdat state to the DB."""
-    args = _Namespace(
+    args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dbconn=dbconn,
         txdiscipline=transaction_style.value,
@@ -56,7 +56,7 @@ def nuke(
     samizdatmodules=tuple(),
 ):
     """Remove any database object tagged as samizdat."""
-    args = _Namespace(
+    args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dbconn=dbconn,
         txdiscipline=transaction_style.value,

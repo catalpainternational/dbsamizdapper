@@ -3,3 +3,5 @@ dist/
 src/DBSamizdat.egg-info/
 VERSION
 .mypy_cache
+.coverage
+.env

@@ -1,25 +1,33 @@
 import argparse
+import os
+import dotenv
 import sys
+import typing
 from enum import Enum
 from logging import getLogger
 from time import monotonic
-from typing import Generator
-import typing
+from typing import Generator, Iterable, Literal, Type
 
-from . import entitypes
-from .exceptions import (DatabaseError, FunctionSignatureError,
-                         SamizdatException)
+from dbsamizdat.samizdat import Samizdat, SamizdatMaterializedView
+
+from .samtypes import ProtoSamizdat, entitypes
+from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
-from .libdb import (DBObjectType, dbinfo_to_class, dbstate_equals_definedstate,
-                    get_dbstate)
-from .libgraph import (depsort_with_sidekicks, node_dump, sanity_check,
-                       subtree_depends)
+from .libdb import (
+    dbinfo_to_class,
+    dbstate_equals_definedstate,
+    get_dbstate,
+)
+from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
 from .loader import get_samizdats
 from .util import fqify_node, nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
-    from psycopg import Cursor
-    from psycopg.rows import Row
+    from argparse import ArgumentParser
+    from psycopg import ClientCursor
+
+dotenv.load_dotenv()
+
 
 class txstyle(Enum):
     CHECKPOINT = "checkpoint"
@@ -27,8 +35,36 @@ class txstyle(Enum):
     DRYRUN = "dryrun"
 
 
+ACTION = Literal["create", "nuke", "update", "refresh", "drop", "sign"]
+
 logger = getLogger(__name__)
 PRINTKWARGS = dict(file=sys.stderr, flush=True)
+
+
+class ArgType(argparse.Namespace):
+    txdiscipline: Literal["checkpoint", "jumbo", "dryrun"] = "dryrun"
+    verbosity: int = 1
+    belownodes: Iterable[str] = []
+    in_django: bool = False
+    log_rather_than_print: bool = False
+    dbconn: str = "default"
+    dburl: str | None = os.environ.get("DBURL")
+
+
+def vprint(args: ArgType, *pargs, **pkwargs):
+    if args.log_rather_than_print:
+        logger.info(" ".join(map(str, pargs)))
+    elif args.verbosity:
+        print(*pargs)
+        print({**PRINTKWARGS, **pkwargs})
+
+
+def vvprint(args: ArgType, *pargs, **pkwargs):
+    if args.log_rather_than_print:
+        logger.debug(" ".join(map(str, pargs)))
+    elif args.verbosity > 1:
+        print(*pargs)
+        print({**PRINTKWARGS, **pkwargs})
 
 
 def timer() -> Generator[float, None, None]:
@@ -42,23 +78,7 @@ def timer() -> Generator[float, None, None]:
         last = cur
 
 
-def vprint(args: argparse.Namespace, *pargs, **pkwargs):
-    if args.log_rather_than_print:
-        logger.info(" ".join(map(str, pargs)))
-    elif args.verbosity:
-        print(*pargs)
-        print({**PRINTKWARGS, **pkwargs})
-
-
-def vvprint(args: argparse.Namespace, *pargs, **pkwargs):
-    if args.log_rather_than_print:
-        logger.debug(" ".join(map(str, pargs)))
-    elif args.verbosity > 1:
-        print(*pargs)
-        print({**PRINTKWARGS, **pkwargs})
-
-
-def get_cursor(args) -> Cursor[Row]:
+def get_cursor(args: ArgType) -> "ClientCursor":
     """
     Returns a psycopg or Django cursor
     """
@@ -72,26 +92,36 @@ def get_cursor(args) -> Cursor[Row]:
             import psycopg  # noqa: F811
         except ImportError as E:
             raise ImportError("Running standalone requires psycopg") from E
-
-        cursor = psycopg.connect(args.dburl).cursor()
+        try:
+            if args.dburl:
+                cursor = psycopg.connect(args.dburl).cursor()
+            else:
+                raise NotImplementedError("No dburl provided: nothing to do!")
+        except psycopg.OperationalError as E:
+            raise Exception(f"URL did not connect: {args.dburl}") from E
     cursor.execute("BEGIN;")  # And so it begins…
     return cursor
 
 
-def txi_finalize(cursor, args):
-    do_what = {txstyle.JUMBO.value: "COMMIT;", txstyle.DRYRUN.value: "ROLLBACK;"}.get(
-        args.txdiscipline
-    )
-    if do_what:
-        cursor.execute(do_what)
+def txi_finalize(cursor: "ClientCursor", args: ArgType):
+    """
+    Executes a ROLLBACK if we're doing a dry run else a COMMIT
+    """
+    if args.txdiscipline == "jumbo":
+        final_clause = "COMMIT;"
+    elif args.txdiscipline == "dryrun":
+        final_clause = "ROLLBACK;"
+    else:
+        raise KeyError("Expected one of COMMIT or ROLLBACK")
+    cursor.execute(final_clause)
 
 
-def cmd_refresh(args):
+def cmd_refresh(args: ArgType):
     cursor = get_cursor(args)
-    samizdats = depsort_with_sidekicks(
-        sanity_check(get_samizdats(args.samizdatmodules))
-    )
-    matviews = [sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW]
+    samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+    matviews: list[SamizdatMaterializedView] = [
+        sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW
+    ]
 
     if args.belownodes:
         rootnodes = {fqify_node(rootnode) for rootnode in args.belownodes}
@@ -116,44 +146,47 @@ def cmd_refresh(args):
     txi_finalize(cursor, args)
 
 
-def cmd_sync(args):
+def cmd_sync(args: ArgType):
+    samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+
     cursor = get_cursor(args)
-    samizdats = depsort_with_sidekicks(
-        sanity_check(get_samizdats(args.samizdatmodules))
-    )
-    issame, excess_dbstate, excess_definedstate = dbstate_equals_definedstate(
-        cursor, samizdats
-    )
-    if issame:
+
+    db_compare = dbstate_equals_definedstate(cursor, samizdats)
+    if db_compare.issame:
         vprint(args, "No differences, nothing to do.")
         return
-    max_namelen = max(len(str(ds)) for ds in excess_dbstate | excess_definedstate)
-    if excess_dbstate:
+    max_namelen = max(
+        len(str(ds))
+        for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
+    )
+    if db_compare.excess_dbstate:
 
         def drops():
-            for sd in excess_dbstate:
-                yield "drop", sd, sd.drop(
-                    if_exists=True
-                )  # we don't know the deptree; so they may have vanished through a cascading drop of a previous object
+            for sd in db_compare.excess_dbstate:
+                yield "drop", sd, sd.drop(if_exists=True)
+                # we don't know the deptree; so they may have vanished
+                # through a cascading drop of a previous object
 
         executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
-        issame, excess_dbstate, excess_definedstate = dbstate_equals_definedstate(
-            cursor, samizdats
-        )  # again, we don't know the in-db deptree, so we need to re-read DB state as the rug may have been pulled out from under us with cascading drops
-    if excess_definedstate:
+        db_compare = dbstate_equals_definedstate(cursor, samizdats)
+        # again, we don't know the in-db deptree, so we need to re-read DB
+        # state as the rug may have been pulled out from under us with cascading
+        # drops
+    if db_compare.excess_definedstate:
 
         def creates():
-            to_create_ids = {sd.head_id() for sd in excess_definedstate}
+            to_create_ids = {sd.head_id() for sd in db_compare.excess_definedstate}
             for sd in samizdats:  # iterate in proper creation order
-                if sd.head_id() in to_create_ids:
-                    yield "create", sd, sd.create()
-                    yield "sign", sd, sd.sign(cursor)
+                if sd.head_id() not in to_create_ids:
+                    continue
+                yield "create", sd, sd.create()
+                yield "sign", sd, sd.sign(cursor)
 
         executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
 
         matviews_to_refresh = {
             sd.head_id()
-            for sd in excess_definedstate
+            for sd in db_compare.excess_definedstate
             if sd.entity_type == entitypes.MATVIEW
         }
         if matviews_to_refresh:
@@ -165,74 +198,92 @@ def cmd_sync(args):
 
             executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
     txi_finalize(cursor, args)
+    cursor.close()
 
 
-def cmd_diff(args):
+def cmd_diff(args: ArgType):
     cursor = get_cursor(args)
-    samizdats = depsort_with_sidekicks(
-        sanity_check(get_samizdats(args.samizdatmodules))
-    )
-    issame, excess_dbstate, excess_definedstate = dbstate_equals_definedstate(
-        cursor, samizdats
-    )
-    if issame:
+    samizdats: list[Samizdat] = depsort_with_sidekicks(sanity_check(get_samizdats()))
+    db_compare = dbstate_equals_definedstate(cursor, samizdats)
+    if db_compare.issame:
         vprint(args, "No differences.")
         exit(0)
 
-    max_namelen = max(len(str(ds)) for ds in excess_dbstate | excess_definedstate)
+    max_namelen = max(
+        len(str(ds))
+        for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
+    )
 
-    def statefmt(state, prefix):
+    def statefmt(state: Iterable[ProtoSamizdat], prefix):
         return "\n".join(
             f"%s%-17s\t%-{max_namelen}s\t%s"
             % (prefix, sd.entity_type.value, sd, sd.definition_hash())
             for sd in sorted(state, key=lambda sd: str(sd))
         )
 
-    if excess_dbstate:
-        vprint(args, statefmt(excess_dbstate, "Not in samizdats:\t"), file=sys.stdout)
-    if excess_definedstate:
+    if db_compare.excess_dbstate:
         vprint(
             args,
-            statefmt(excess_definedstate, "Not in database:   \t"),
+            statefmt(db_compare.excess_dbstate, "Not in samizdats:\t"),
             file=sys.stdout,
         )
-    exit(100 + (1 if excess_dbstate else 0 | 2 if excess_definedstate else 0))
-
-
-def cmd_printdot(args):
-    print(
-        "\n".join(
-            dot(
-                depsort_with_sidekicks(
-                    sanity_check(get_samizdats(args.samizdatmodules))
-                )
-            )
+    if db_compare.excess_definedstate:
+        vprint(
+            args,
+            statefmt(db_compare.excess_definedstate, "Not in database:   \t"),
+            file=sys.stdout,
         )
-    )
+    cursor.close()
+
+    # Exit code depends on the database state and
+    # defined state
+    exitcode = 100
+    exitflag = 0
+
+    if db_compare.excess_dbstate:
+        exitflag | +1
+    if db_compare.excess_definedstate:
+        exitflag | +2
+
+    exit(exitcode + exitflag)
 
 
-def cmd_nuke(args, samizdats=None):
+def cmd_printdot(args: ArgType):
+    print("\n".join(dot(depsort_with_sidekicks(sanity_check(get_samizdats())))))
+
+
+def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
     cursor = get_cursor(args)
 
     def nukes():
-        nonlocal samizdats
-        if samizdats is None:
-            samizdats = map(
-                dbinfo_to_class,
-                filter(lambda a: a[-1] is not None, get_dbstate(cursor)),
-            )
-        for sd in samizdats:
+        # If "samizdats" is not defined fetch from the database
+
+        if samizdats is not None:
+            yield from (("nuke", sd, sd.drop(if_exists=True)) for sd in samizdats)
+
+        # If "samizdats" is not defined fetch from the database
+        for state in get_dbstate(cursor):
+            if state.commentcontent is None:
+                continue
+            sd = dbinfo_to_class(state)
             yield ("nuke", sd, sd.drop(if_exists=True))
 
     executor(nukes(), args, cursor)
     txi_finalize(cursor, args)
+    cursor.close()
 
 
-def executor(yielder, args, cursor, max_namelen=0, timing=False):
+def executor(
+    yielder: Iterable[tuple[ACTION, Samizdat | Type[ProtoSamizdat], str]],
+    args: ArgType,
+    cursor: "ClientCursor",
+    max_namelen=0,
+    timing=False,
+):
     action_timer = timer()
     next(action_timer)
 
-    def progressprint(ix, action_totake, sd, sql):
+    def progressprint(ix, action_totake, sd: Samizdat | Type[ProtoSamizdat], sql):
         if args.verbosity:
             if ix:
                 # print the processing time of the *previous* action
@@ -252,7 +303,9 @@ def executor(yielder, args, cursor, max_namelen=0, timing=False):
         action_totake, sd, sql = progress
         try:
             try:
-                cursor.execute("BEGIN;")  # harmless if already in a tx
+                cursor.execute(
+                    "BEGIN;"
+                )  # harmless if already in a tx but raises a warning
                 cursor.execute(f"SAVEPOINT action_{action_totake};")
                 cursor.execute(sql)
             except Exception as ouch:
@@ -262,27 +315,26 @@ def executor(yielder, args, cursor, max_namelen=0, timing=False):
                     )  # get back to a non-error state
                     candidate_args = [
                         c[3]
-                        for c in get_dbstate(
-                            cursor,
-                            which=DBObjectType.FOREIGN,
-                            entity_types=(entitypes.FUNCTION,),
-                        )
-                        if c[:2] == (sd.schema, sd.function_name)
+                        for c in get_dbstate(cursor)
+                        if c[:2] == (sd.schema, getattr(sd, "function_name", ""))
                     ]
                     raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
         except Exception as dberr:
             raise DatabaseError(f"{action_totake} failed", dberr, sd, sql)
         cursor.execute(f"RELEASE SAVEPOINT action_{action_totake};")
-        if args.txdiscipline == txstyle.CHECKPOINT.value and action_totake != "create":
-            # only commit *after* signing, otherwise if later the signing somehow fails we'll have created an orphan DB object that we don't recognize as ours
+        if action_totake != "create":
+            # only commit *after* signing, otherwise if later the signing somehow fails
+            # we'll have created an orphan DB object that we don't recognize as ours
             cursor.execute("COMMIT;")
 
     if action_cnt:
         vprint(args, "%.2fs" % next(action_timer) if timing else "")
 
 
-def augment_argument_parser(p, in_django=False, log_rather_than_print=True):
+def augment_argument_parser(
+    p: "ArgumentParser", in_django=False, log_rather_than_print=True
+):
     def perhaps_add_modules_argument(parser):
         if not in_django:
             parser.add_argument(
@@ -297,12 +349,12 @@ def augment_argument_parser(p, in_django=False, log_rather_than_print=True):
                 "dbconn",
                 nargs="?",
                 default="default",
-                help="Django DB connection key (default:'default'). If you don't know what this is, then you don't need it.",
+                help="Django DB connection key (default:'default'). If you don't know what this is, then you don't need it.",  # noqa: E501
             )
         else:
             parser.add_argument(
                 "dburl",
-                help="PostgreSQL DB connection string. Trivially, this might be 'postgresql:///mydbname'. See https://www.postgresql.org/docs/14/static/libpq-connect.html#id-1.7.3.8.3.6 .",
+                help="PostgreSQL DB connection string. Trivially, this might be 'postgresql:///mydbname'. See https://www.postgresql.org/docs/14/static/libpq-connect.html#id-1.7.3.8.3.6 .",  # noqa: E501
             )
 
     def add_txdiscipline_argument(parser):
@@ -315,7 +367,7 @@ def augment_argument_parser(p, in_django=False, log_rather_than_print=True):
                 txstyle.DRYRUN.value,
             ),
             default=txstyle.CHECKPOINT.value,
-            help=f"""Transaction discipline. The "{txstyle.CHECKPOINT.value}" level commits after every dbsamizdat-level action. The safe default of "{txstyle.JUMBO.value}" creates one large transaction. "{txstyle.DRYRUN.value}" also creates one large transaction, but rolls it back.""",
+            help=f"""Transaction discipline. The "{txstyle.CHECKPOINT.value}" level commits after every dbsamizdat-level action. The safe default of "{txstyle.JUMBO.value}" creates one large transaction. "{txstyle.DRYRUN.value}" also creates one large transaction, but rolls it back.""",  # noqa: E501
         )
 
     p.set_defaults(
@@ -361,7 +413,7 @@ def augment_argument_parser(p, in_django=False, log_rather_than_print=True):
 
     p_diff = subparsers.add_parser(
         "diff",
-        help="Show differences between dbsamizdat state and database state. Exits nonzero if any are found: 101 when there are excess DB-side objects, 102 if there are excess python-side objects, 103 if both sides have excess objects.",
+        help="Show differences between dbsamizdat state and database state. Exits nonzero if any are found: 101 when there are excess DB-side objects, 102 if there are excess python-side objects, 103 if both sides have excess objects.",  # noqa: E501
     )
     p_diff.set_defaults(func=cmd_diff)
     add_dbarg_argument(p_diff)
@@ -391,7 +443,7 @@ def augment_argument_parser(p, in_django=False, log_rather_than_print=True):
 
 def main():
     p = argparse.ArgumentParser(
-        description="dbsamizdat, the blissfully naive PostgreSQL database object manager."
+        description="dbsamizdat, the blissfully naive PostgreSQL database object manager."  # noqa: E501
     )
     augment_argument_parser(p, log_rather_than_print=False)
     args = p.parse_args()

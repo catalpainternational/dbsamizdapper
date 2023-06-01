@@ -1,3 +1,4 @@
+import typing
 from collections import Counter
 from functools import reduce
 from itertools import chain
@@ -5,57 +6,58 @@ from operator import or_
 
 from toposort import CircularDependencyError, toposort
 
-from . import entitypes
-from .exceptions import (DanglingReferenceError, DependencyCycleError,
-                         NameClashError, TypeConfusionError)
+from dbsamizdat.samizdat import Samizdat
+
+from .samtypes import HasRefreshTriggers, ProtoSamizdat
+from .exceptions import (
+    DanglingReferenceError,
+    DependencyCycleError,
+    NameClashError,
+    TypeConfusionError,
+)
 
 
-def gen_edges(samizdats):
+def gen_edges(samizdats: typing.Iterable[Samizdat]):
     for sd in samizdats:
         for n2 in sd.fqdeps_on():
-            yield (n2, sd.fq)
+            yield (n2, sd.fq())
 
 
-def gen_autorefresh_edges(samizdats):
-    for sd in filter(lambda sd: sd.entity_type == entitypes.MATVIEW, samizdats):
-        for n2 in sd.refresh_triggers:
-            yield (n2, sd.fq)
+def gen_autorefresh_edges(
+    samizdats: typing.Iterable[ProtoSamizdat | HasRefreshTriggers],
+):
+    for sd in samizdats:
+        if hasattr(sd, "refresh_triggers"):
+            yield (sd, sd.fq())
 
 
-def gen_unmanaged_edges(samizdats):
+def gen_unmanaged_edges(samizdats: typing.Iterable[Samizdat]):
     for sd in samizdats:
         for n2 in sd.fqdeps_on_unmanaged():
-            yield (n2, sd.fq)
+            yield (n2, sd.fq())
 
 
-def node_dump(samizdats):
+def node_dump(samizdats: typing.Iterable[Samizdat]):
     """
     All nodes (managed or unmanaged)
     """
-    return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq} for sd in samizdats))
+    return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq()} for sd in samizdats))
 
 
-def unmanaged_refs(samizdats):
+def unmanaged_refs(samizdats: typing.Iterable[Samizdat | HasRefreshTriggers]):
     """
     All unmanaged nodes referenced
     """
-    return set(
-        reduce(
-            or_,
-            (
-                sd.fqdeps_on_unmanaged()
-                | (
-                    sd.fqrefresh_triggers()
-                    if (sd.entity_type == entitypes.MATVIEW)
-                    else set()
-                )
-                for sd in samizdats
-            ),
-        )
-    )
+    set_of_refs = set()
+    for sd in samizdats:
+        if hasattr(sd, "fqrefresh_triggers"):
+            set_of_refs.update(sd.fqrefresh_triggers())
+        if hasattr(sd, "fqdeps_on_unmanaged"):
+            set_of_refs.update(sd.fqdeps_on_unmanaged())
+    return set_of_refs
 
 
-def subtree_nodes(samizdats, subtree_root):
+def subtree_nodes(samizdats: list[Samizdat], subtree_root):
     """
     All nodes depending on subtree_root (includes subtree_root)
     """
@@ -63,7 +65,7 @@ def subtree_nodes(samizdats, subtree_root):
     def stn(subtree_root):
         yield subtree_root
         revdeps = (
-            sd.fq
+            sd.fq()
             for sd in samizdats
             if (subtree_root in (sd.fqdeps_on() | sd.fqdeps_on_unmanaged()))
         )
@@ -72,11 +74,11 @@ def subtree_nodes(samizdats, subtree_root):
     return set(stn(subtree_root))
 
 
-def subtree_depends(samizdats, roots):
+def subtree_depends(samizdats: list[Samizdat], roots):
     """
     Samizdats directly or indirectly depending on any root in roots
     """
-    sdmap = {sd.fq: sd for sd in samizdats}
+    sdmap = {sd.fq(): sd for sd in samizdats}
     return reduce(
         or_,
         (
@@ -92,32 +94,33 @@ def subtree_depends(samizdats, roots):
     )
 
 
-def depsort(samizdats):
+def depsort(samizdats: typing.Iterable[Samizdat]):
     """
     Topologically sort samizdats
     """
-    samizdat_map = {sd.fq: sd for sd in samizdats}
-    depmap = {sd.fq: sd.fqdeps_on() for sd in samizdats}
+    samizdat_map = {sd.fq(): sd for sd in samizdats}
+    depmap = {sd.fq(): sd.fqdeps_on() for sd in samizdats}
+
+    toposorted = toposort(depmap)
+
     return [
-        samizdat_map[name]
-        for name in chain(*(sorted(level) for level in toposort(depmap)))
+        samizdat_map[name] for name in chain(*(sorted(level) for level in toposorted))
     ]
 
 
-def depsort_with_sidekicks(samizdats):
-    counter = Counter()
-    return list(chain(*(sd.and_sidekicks(counter) for sd in depsort(samizdats))))
+def depsort_with_sidekicks(samizdats: typing.Iterable[Samizdat]):
+    return list(chain(*(sd.and_sidekicks() for sd in depsort(samizdats))))
 
 
-def sanity_check(samizdats):
+def sanity_check(samizdats: typing.Iterable[Samizdat]):
     for sd in samizdats:
         sd.validate_name()
-    sd_fqs = set(sd.fq for sd in samizdats)
+    sd_fqs = set(sd.fq() for sd in samizdats)
     sd_deps = set(chain(*(sd.fqdeps_on() for sd in samizdats)))
     sd_deps_unmanaged = set(chain(*(sd.deps_on_unmanaged for sd in samizdats)))
 
     # are there any classes with ambiguous DB identity?
-    if len(sd_fqs) < len(samizdats):
+    if len(sd_fqs) < len(list(samizdats)):
         cnt = Counter((sd.db_object_identity for sd in samizdats))
         nonunique = [db_id for db_id, count in cnt.items() if count > 1]
         if nonunique:
@@ -134,13 +137,13 @@ def sanity_check(samizdats):
             "Samizdat entity is also declared as *unmanaged* dependency: %s" % confused
         )
     # cycle detection - top level
-    selfreffaulty = {sd for sd in samizdats if sd.fq in sd.deps_on}
+    selfreffaulty = {sd for sd in samizdats if sd.fq() in sd.deps_on}
     if selfreffaulty:
         raise DependencyCycleError(
             "Self-referential dependency", (selfreffaulty.pop(),)
         )
     # cycle detection - other levels; toposort will raise an exception if there's one
-    sdfqmap = {sd.fq: sd for sd in samizdats}
+    sdfqmap = {sd.fq(): sd for sd in samizdats}
     try:
         _ = depsort_with_sidekicks(samizdats)
     except CircularDependencyError as ouch:

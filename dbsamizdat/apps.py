@@ -1,19 +1,29 @@
-from argparse import Namespace
-
 from django.apps import AppConfig
 from django.conf import settings
 from django.contrib.contenttypes.management import RenameContentType
 from django.core.management.color import color_style
-from django.db.migrations import (AddField, AlterField, AlterModelTable,
-                                  DeleteModel, RemoveField, RenameField,
-                                  RenameModel, RunPython, RunSQL)
+from django.db.migrations import (
+    AddField,
+    AlterField,
+    AlterModelTable,
+    DeleteModel,
+    RemoveField,
+    RenameField,
+    RenameModel,
+    RunPython,
+    RunSQL,
+)
 from django.db.models.signals import post_migrate, pre_migrate
 
 from .libdb import dbstate_equals_definedstate
-from .libgraph import (depsort_with_sidekicks, sanity_check, subtree_depends,
-                       unmanaged_refs)
+from .libgraph import (
+    depsort_with_sidekicks,
+    sanity_check,
+    subtree_depends,
+    unmanaged_refs,
+)
 from .loader import get_samizdats
-from .runner import cmd_nuke, cmd_sync, get_cursor, txstyle
+from .runner import ArgType, cmd_nuke, cmd_sync, get_cursor, txstyle
 from .util import fqify_node
 
 DBCONN = (
@@ -26,7 +36,7 @@ style = color_style()
 
 
 def get_cmd_args(**kwargs):
-    return Namespace(
+    return ArgType(
         printprogress=True,
         verbosity=kwargs["verbosity"],
         dbconn=DBCONN,
@@ -47,7 +57,7 @@ def nuke(samizdats=None, **kwargs):
 
 def get_django_cursor():
     return get_cursor(
-        Namespace(
+        ArgType(
             in_django=True,
             dbconn=DBCONN,
         )
@@ -113,8 +123,8 @@ def premigrate_handler(sender, **kwargs):
         return
 
     samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
-    is_synced, *_whatevs = dbstate_equals_definedstate(get_django_cursor(), samizdats)
-    if not is_synced:
+    db_compare = dbstate_equals_definedstate(get_django_cursor(), samizdats)
+    if not db_compare.issame:
         # There's unsynced samizdat state, and we can't tell if
         # a) new state depends on the post-migrate state or the pre-migrate state
         # b) old state will get in the way of the migrations

@@ -1,5 +1,9 @@
-from dbsamizdat import (SamizdatFunction, SamizdatMaterializedView,
-                        SamizdatTrigger, SamizdatView)
+from dbsamizdat import (
+    SamizdatFunction,
+    SamizdatMaterializedView,
+    SamizdatTrigger,
+    SamizdatView,
+)
 
 fruittable_SQL = """
     CREATE TABLE "Fruit" (
@@ -51,7 +55,8 @@ class DealFruitFun(SamizdatFunction):
         ${{preamble}}
         RETURNS text AS
         $BODY$
-        SELECT format('Have a piece of %s !', name) FROM {DealFruitView.db_object_identity}
+        SELECT format('Have a piece of %s !', name)
+            FROM {DealFruitView.db_object_identity()}
         $BODY$
         LANGUAGE SQL
         IMMUTABLE
@@ -66,7 +71,7 @@ class DealFruitFunWithName(SamizdatFunction):
         ${{preamble}}
         RETURNS text AS
         $BODY$
-        SELECT format('Hey %s! %s', name, "{DealFruitFun.name}"())
+        SELECT format('Hey %s! %s', name, "{DealFruitFun.get_name()}"())
         $BODY$
         LANGUAGE SQL
         IMMUTABLE
@@ -79,7 +84,7 @@ class Treat(SamizdatMaterializedView):
     refresh_triggers = {("public", "Pet"), ("public", "Fruit")}
     sql_template = f"""
         ${{preamble}}
-        SELECT "{DealFruitFunWithName.name}"(name) AS treat FROM "public"."Pet"
+        SELECT "{DealFruitFunWithName.get_name()}"(name) AS treat FROM "public"."Pet"
         ${{postamble}};
     """
 
