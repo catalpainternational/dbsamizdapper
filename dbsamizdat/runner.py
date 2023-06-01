@@ -82,7 +82,7 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     Returns a psycopg or Django cursor
     """
 
-    hasurl = args.dburl is not None
+    dburl = getattr(args, "dburl", None)
 
     if args.in_django:
         from django.db import connections
@@ -92,16 +92,16 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     elif not args.dburl:
         raise NotImplementedError("No dburl provided: nothing to do!")
 
-    elif hasurl and find_spec("psycopg"):
+    elif dburl and find_spec("psycopg"):
         import psycopg  # noqa: F811
 
-        conn = psycopg.connect(args.dburl)
+        conn = psycopg.connect(dburl)
         cursor = psycopg.ClientCursor(conn)
 
-    elif hasurl and find_spec("psycopg2"):
+    elif dburl and find_spec("psycopg2"):
         import psycopg2
 
-        conn = psycopg2.connect(args.dburl)
+        conn = psycopg2.connect(dburl)
         cursor = conn.cursor()
 
     cursor.execute("BEGIN;")
