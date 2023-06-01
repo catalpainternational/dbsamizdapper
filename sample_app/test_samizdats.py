@@ -1,9 +1,4 @@
-from dbsamizdat import (
-    SamizdatFunction,
-    SamizdatMaterializedView,
-    SamizdatTrigger,
-    SamizdatView,
-)
+from dbsamizdat import SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
 
 fruittable_SQL = """
     CREATE TABLE "Fruit" (

@@ -10,9 +10,7 @@ class Command(BaseCommand):
     help = "Play nice with dbsamizdat."
 
     def create_parser(self, *args, **kwargs):
-        return super(Command, self).create_parser(
-            *args, **{**kwargs, **{"conflict_handler": "resolve"}}
-        )
+        return super(Command, self).create_parser(*args, **{**kwargs, **{"conflict_handler": "resolve"}})
 
     def add_arguments(self, parser):
         augment_argument_parser(parser, in_django=True, log_rather_than_print=False)

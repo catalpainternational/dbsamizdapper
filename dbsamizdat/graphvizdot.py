@@ -1,13 +1,9 @@
 from typing import Iterable
+
 from dbsamizdat.samizdat import Samizdat
+
+from .libgraph import gen_autorefresh_edges, gen_edges, gen_unmanaged_edges, toposort, unmanaged_refs
 from .samtypes import entitypes
-from .libgraph import (
-    gen_autorefresh_edges,
-    gen_edges,
-    gen_unmanaged_edges,
-    toposort,
-    unmanaged_refs,
-)
 from .util import nodenamefmt
 
 
@@ -46,9 +42,7 @@ def dot(samizdats: Iterable[Samizdat]):
     node [style="filled" fontname="sans-serif" margin="0.15, 0.15"];
     newrank="true";
     """
-    yield "\n".join(
-        ('"%s" [shape=house fillcolor=yellow]' % n for n in unmanaged_fmted)
-    )
+    yield "\n".join(('"%s" [shape=house fillcolor=yellow]' % n for n in unmanaged_fmted))
     yield "\n".join(map(nodefmt, samizdats))
     yield "}"
 
@@ -60,12 +54,7 @@ def dot(samizdats: Iterable[Samizdat]):
             for e in nice_edges(gen_autorefresh_edges(samizdats))
         )
     )
-    yield "\n".join(
-        (
-            '"%s" -> "%s" [color="red"]' % e
-            for e in nice_edges(gen_unmanaged_edges(samizdats))
-        )
-    )
+    yield "\n".join(('"%s" -> "%s" [color="red"]' % e for e in nice_edges(gen_unmanaged_edges(samizdats))))
 
     if unmanaged:
         yield "{ rank=min; %s }" % " ".join(map(enquote, unmanaged_fmted))

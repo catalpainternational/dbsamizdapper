@@ -1,20 +1,18 @@
 # content of test_sample.py
 import os
-from dotenv import load_dotenv
-import psycopg
 
 import pytest
+from dotenv import load_dotenv
+
+from dbsamizdat.graphvizdot import dot
 from dbsamizdat.libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from dbsamizdat.libgraph import depsort_with_sidekicks, sanity_check
 from dbsamizdat.loader import get_samizdats
 from dbsamizdat.runner import ArgType, cmd_nuke, cmd_sync, get_cursor
-
-from dbsamizdat.graphvizdot import dot
-
 from dbsamizdat.samizdat import SamizdatMaterializedView, SamizdatView
 from dbsamizdat.samtypes import FQTuple
-from dbsamizdat.test_samizdats import DealFruitFun, DealFruitFunWithName
 from dbsamizdat.util import db_object_identity
+from sample_app.test_samizdats import DealFruitFun, DealFruitFunWithName
 
 load_dotenv()
 
@@ -117,9 +115,7 @@ def test_code_generation():
 
     db_object_identity(DealFruitFunWithName)
     with get_cursor(args) as cursor:
-        assert DealFruitFunWithName.sign(cursor) != DealFruitFun.sign(
-        cursor
-    )
+        assert DealFruitFunWithName.sign(cursor) != DealFruitFun.sign(cursor)
 
 
 def test_create_view():
@@ -147,7 +143,6 @@ def test_create_view():
         get_dbstate(cursor)
         # We've just done a sync so dbstate should equal defined state
         assert dbstate_equals_definedstate(cursor, samizdats).issame
-
 
     cmd_sync(args)
     cmd_nuke(args)

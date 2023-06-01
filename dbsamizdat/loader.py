@@ -1,16 +1,10 @@
+import inspect
 from importlib import import_module
 from importlib.util import find_spec
-import inspect
 from logging import getLogger
 from typing import Iterable
 
-from dbsamizdat.samizdat import (
-    Samizdat,
-    SamizdatFunction,
-    SamizdatMaterializedView,
-    SamizdatTrigger,
-    SamizdatView,
-)
+from dbsamizdat.samizdat import Samizdat, SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
 from dbsamizdat.samtypes import ProtoSamizdat
 
 excludelist = {
@@ -33,9 +27,7 @@ def get_samizdats() -> set[Samizdat]:
     """
 
     def all_subclasses(cls):
-        return set(cls.__subclasses__()).union(
-            [s for c in cls.__subclasses__() for s in all_subclasses(c)]
-        )
+        return set(cls.__subclasses__()).union([s for c in cls.__subclasses__() for s in all_subclasses(c)])
 
     return all_subclasses(Samizdat).difference(excludelist)
 
@@ -45,11 +37,7 @@ def samizdats_in_module(mod):
     Returns the samizdat instances in a given module
     """
     for _, thing in inspect.getmembers(mod):
-        if (
-            inspect.isclass(thing)
-            and ProtoSamizdat in thing.mro()
-            and thing not in excludelist
-        ):
+        if inspect.isclass(thing) and ProtoSamizdat in thing.mro() and thing not in excludelist:
             yield thing
 
 

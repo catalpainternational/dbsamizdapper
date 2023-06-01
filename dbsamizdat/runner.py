@@ -1,26 +1,24 @@
 import argparse
-from contextlib import contextmanager
 import os
-import dotenv
 import sys
 import typing
+from contextlib import contextmanager
 from enum import Enum
+from importlib.util import find_spec
 from logging import getLogger
 from time import monotonic
 from typing import Generator, Iterable, Literal, Type
 
+import dotenv
+
 from dbsamizdat.samizdat import Samizdat, SamizdatMaterializedView
 
-from .samtypes import ProtoSamizdat, entitypes, Cursor
 from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
-from .libdb import (
-    dbinfo_to_class,
-    dbstate_equals_definedstate,
-    get_dbstate,
-)
+from .libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
 from .loader import get_samizdats
+from .samtypes import Cursor, ProtoSamizdat, entitypes
 from .util import fqify_node, nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
@@ -83,28 +81,31 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     """
     Returns a psycopg or Django cursor
     """
+
+    hasurl = args.dburl is not None
+
     if args.in_django:
         from django.db import connections
-        cursor = connections[args.dbconn].cursor().cursor
-        cursor.execute("BEGIN;")
-        yield cursor
 
-    else:
-        try:
-            import psycopg  # noqa: F811
-        except ImportError as E:
-            raise ImportError("Running standalone requires psycopg") from E
-        try:
-            if args.dburl:
-                conn = psycopg.connect(args.dburl)
-                cursor = psycopg.ClientCursor(conn)
-                assert hasattr(cursor, 'mogrify')
-            else:
-                raise NotImplementedError("No dburl provided: nothing to do!")
-        except psycopg.OperationalError as E:
-            raise Exception(f"URL did not connect: {args.dburl}") from E
-        cursor.execute("BEGIN;")  # And so it begins…
-        yield cursor
+        cursor = connections[args.dbconn].cursor().cursor
+
+    elif not args.dburl:
+        raise NotImplementedError("No dburl provided: nothing to do!")
+
+    elif hasurl and find_spec("psycopg"):
+        import psycopg  # noqa: F811
+
+        conn = psycopg.connect(args.dburl)
+        cursor = psycopg.ClientCursor(conn)
+
+    elif hasurl and find_spec("psycopg2"):
+        import psycopg2
+
+        conn = psycopg2.connect(args.dburl)
+        cursor = conn.cursor()
+
+    cursor.execute("BEGIN;")
+    yield cursor
 
     txi_finalize(cursor, args)
     cursor.close()
@@ -126,9 +127,7 @@ def txi_finalize(cursor: Cursor, args: ArgType):
 def cmd_refresh(args: ArgType):
     with get_cursor(args) as cursor:
         samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
-        matviews: list[SamizdatMaterializedView] = [
-            sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW
-        ]
+        matviews: list[SamizdatMaterializedView] = [sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW]
 
         if args.belownodes:
             rootnodes = {fqify_node(rootnode) for rootnode in args.belownodes}
@@ -136,9 +135,7 @@ def cmd_refresh(args: ArgType):
             if rootnodes - allnodes:
                 raise ValueError(
                     """Unknown rootnodes:\n\t- %s"""
-                    % "\n\t- ".join(
-                        [nodenamefmt(rootnode) for rootnode in rootnodes - allnodes]
-                    )
+                    % "\n\t- ".join([nodenamefmt(rootnode) for rootnode in rootnodes - allnodes])
                 )
             subtree_bundle = subtree_depends(samizdats, rootnodes)
             matviews = [sd for sd in matviews if sd in subtree_bundle]
@@ -156,15 +153,11 @@ def cmd_sync(args: ArgType):
     samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
 
     with get_cursor(args) as cursor:
-
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
         if db_compare.issame:
             vprint(args, "No differences, nothing to do.")
             return
-        max_namelen = max(
-            len(str(ds))
-            for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
-        )
+        max_namelen = max(len(str(ds)) for ds in db_compare.excess_dbstate | db_compare.excess_definedstate)
         if db_compare.excess_dbstate:
 
             def drops():
@@ -191,9 +184,7 @@ def cmd_sync(args: ArgType):
             executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
 
             matviews_to_refresh = {
-                sd.head_id()
-                for sd in db_compare.excess_definedstate
-                if sd.entity_type == entitypes.MATVIEW
+                sd.head_id() for sd in db_compare.excess_definedstate if sd.entity_type == entitypes.MATVIEW
             }
             if matviews_to_refresh:
 
@@ -213,15 +204,11 @@ def cmd_diff(args: ArgType):
             vprint(args, "No differences.")
             exit(0)
 
-        max_namelen = max(
-            len(str(ds))
-            for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
-        )
+        max_namelen = max(len(str(ds)) for ds in db_compare.excess_dbstate | db_compare.excess_definedstate)
 
         def statefmt(state: Iterable[ProtoSamizdat], prefix):
             return "\n".join(
-                f"%s%-17s\t%-{max_namelen}s\t%s"
-                % (prefix, sd.entity_type.value, sd, sd.definition_hash())
+                f"%s%-17s\t%-{max_namelen}s\t%s" % (prefix, sd.entity_type.value, sd, sd.definition_hash())
                 for sd in sorted(state, key=lambda sd: str(sd))
             )
 
@@ -291,8 +278,7 @@ def executor(
                 vprint(args, "%.2fs" % next(action_timer) if timing else "")
             vprint(
                 args,
-                f"%-7s %-17s %-{max_namelen}s ..."
-                % (action_totake, sd.entity_type.value, sd),
+                f"%-7s %-17s %-{max_namelen}s ..." % (action_totake, sd.entity_type.value, sd),
                 end="",
             )
             vvprint(args, f"\n\n{sqlfmt(sql)}\n\n")
@@ -300,24 +286,21 @@ def executor(
     action_cnt = 0
     for ix, progress in enumerate(yielder):
         action_cnt += 1
-        progressprint(ix, *progress)
+        try:
+            progressprint(ix, *progress)
+        except:
+            raise
         action_totake, sd, sql = progress
         try:
             try:
-                cursor.execute(
-                    "BEGIN;"
-                )  # harmless if already in a tx but raises a warning
+                cursor.execute("BEGIN;")  # harmless if already in a tx but raises a warning
                 cursor.execute(f"SAVEPOINT action_{action_totake};")
                 cursor.execute(sql)
             except Exception as ouch:
                 if action_totake == "sign":
-                    cursor.execute(
-                        f"ROLLBACK TO SAVEPOINT action_{action_totake};"
-                    )  # get back to a non-error state
+                    cursor.execute(f"ROLLBACK TO SAVEPOINT action_{action_totake};")  # get back to a non-error state
                     candidate_args = [
-                        c[3]
-                        for c in get_dbstate(cursor)
-                        if c[:2] == (sd.schema, getattr(sd, "function_name", ""))
+                        c[3] for c in get_dbstate(cursor) if c[:2] == (sd.schema, getattr(sd, "function_name", ""))
                     ]
                     raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
@@ -333,9 +316,7 @@ def executor(
         vprint(args, "%.2fs" % next(action_timer) if timing else "")
 
 
-def augment_argument_parser(
-    p: "ArgumentParser", in_django=False, log_rather_than_print=True
-):
+def augment_argument_parser(p: "ArgumentParser", in_django=False, log_rather_than_print=True):
     def perhaps_add_modules_argument(parser):
         if not in_django:
             parser.add_argument(
@@ -406,9 +387,7 @@ def augment_argument_parser(
     add_txdiscipline_argument(p_nuke)
     add_dbarg_argument(p_nuke)
 
-    p_printdot = subparsers.add_parser(
-        "printdot", help="Print DB object dependency tree in GraphViz format."
-    )
+    p_printdot = subparsers.add_parser("printdot", help="Print DB object dependency tree in GraphViz format.")
     p_printdot.set_defaults(func=cmd_printdot)
     perhaps_add_modules_argument(p_printdot)
 
@@ -420,9 +399,7 @@ def augment_argument_parser(
     add_dbarg_argument(p_diff)
     perhaps_add_modules_argument(p_diff)
 
-    p_refresh = subparsers.add_parser(
-        "refresh", help="Refresh materialized views, in dependency order"
-    )
+    p_refresh = subparsers.add_parser("refresh", help="Refresh materialized views, in dependency order")
     p_refresh.set_defaults(func=cmd_refresh)
     add_txdiscipline_argument(p_refresh)
     add_dbarg_argument(p_refresh)

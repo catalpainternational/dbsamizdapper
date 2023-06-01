@@ -1,18 +1,12 @@
+import warnings
 from enum import IntFlag
 from json import loads as jsonloads
-from typing import TYPE_CHECKING, Iterable, NamedTuple, Type
-import warnings
-
-from .samtypes import ProtoSamizdat, entitypes, Cursor
+from typing import Iterable, NamedTuple, Type
 
 from dbsamizdat.samizdat import Samizdat
 
-from . import (
-    SamizdatFunction,
-    SamizdatMaterializedView,
-    SamizdatTrigger,
-    SamizdatView,
-)
+from . import SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
+from .samtypes import Cursor, ProtoSamizdat, entitypes
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
 
@@ -112,17 +106,13 @@ def get_dbstate(
         items = (StateTuple(*c) for c in cursor.fetchall())
         # Comment is the last item in the query
         for item in items:
-            if not (
-                item.commentcontent and item.commentcontent.startswith(COMMENT_MAGIC)
-            ):
+            if not (item.commentcontent and item.commentcontent.startswith(COMMENT_MAGIC)):
                 continue
             try:
                 meta = jsonloads(item.commentcontent)["dbsamizdat"]
                 # This is probably? a DBSamizdat
                 # Get the hash value from the comment
-                hashattr = (
-                    "sql_template_hash" if meta["version"] == 0 else "definition_hash"
-                )
+                hashattr = "sql_template_hash" if meta["version"] == 0 else "definition_hash"
                 yield item._replace(definition_hash=meta[hashattr])
             except Exception as E:
                 warnings.warn(f"{E}")
@@ -163,9 +153,7 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
                 on_table=(info.schemaname, table),
             )
         )
-    klass: type[Samizdat] = type(
-        info.viewname, (typemap[entitypes[info.objecttype]],), classfields
-    )
+    klass: type[Samizdat] = type(info.viewname, (typemap[entitypes[info.objecttype]],), classfields)
     return klass
 
 

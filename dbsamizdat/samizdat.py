@@ -1,20 +1,13 @@
 from __future__ import annotations
-from collections import Counter
-import typing
 
+import typing
+from collections import Counter
 from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
 
-from dbsamizdat.samtypes import (
-    FQTuple,
-    HasRefreshTriggers,
-    Mogrifier,
-    ProtoSamizdat,
-    HasFQ,
-    entitypes,
-)
+from dbsamizdat.samtypes import FQTuple, HasFQ, HasRefreshTriggers, Mogrifier, ProtoSamizdat, entitypes
 
 from .util import db_object_identity, fqify_node, nodenamefmt
 
@@ -42,11 +35,7 @@ class Samizdat(ProtoSamizdat):
 
     def __str__(self):
         funcargs = getattr(self, "function_arguments_signature", None)
-        node = (
-            (self.schema, self.get_name(), funcargs)
-            if funcargs
-            else (self.schema, self.get_name())
-        )
+        node = (self.schema, self.get_name(), funcargs) if funcargs else (self.schema, self.get_name())
         return nodenamefmt(node)
 
     @classmethod
@@ -62,9 +51,7 @@ class Samizdat(ProtoSamizdat):
         if cls.implanted_hash:
             return cls.implanted_hash
 
-        return md5(
-            "|".join([cls.sql_template, cls.db_object_identity()]).encode("utf-8")
-        ).hexdigest()
+        return md5("|".join([cls.sql_template, cls.db_object_identity()]).encode("utf-8")).hexdigest()
 
     @classmethod
     def fqify(cls, ref: HasFQ):
@@ -108,10 +95,13 @@ class Samizdat(ProtoSamizdat):
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
         """
-        return cursor.mogrify(
+        comment = cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
             (cls.dbinfo(),),
         )
+        if isinstance(comment, bytes):
+            return comment.decode()
+        return comment
 
     @classmethod
     def create(cls):
@@ -142,9 +132,7 @@ class Samizdat(ProtoSamizdat):
 
     @classmethod
     def head_id(cls):
-        return hash(
-            (cls.schema, cls.get_name(), cls.entity_type.name, cls.definition_hash())
-        )
+        return hash((cls.schema, cls.get_name(), cls.entity_type.name, cls.definition_hash()))
 
 
 class SamizdatView(Samizdat):
@@ -191,9 +179,7 @@ class SamizdatFunction(Samizdat):
 
         # "Functions" adapt the hash to include creation options
         return md5(
-            "|".join(
-                [cls.sql_template, cls.db_object_identity(), cls.creation_identity()]
-            ).encode("utf-8")
+            "|".join([cls.sql_template, cls.db_object_identity(), cls.creation_identity()]).encode("utf-8")
         ).hexdigest()
 
     @classmethod
@@ -210,9 +196,7 @@ class SamizdatFunction(Samizdat):
 
     @classmethod
     def head_id(cls):
-        return hash(
-            (cls.schema, cls.get_name(), cls.entity_type.name, cls.definition_hash())
-        )
+        return hash((cls.schema, cls.get_name(), cls.entity_type.name, cls.definition_hash()))
 
 
 class SamizdatTrigger(Samizdat):
@@ -236,9 +220,7 @@ class SamizdatTrigger(Samizdat):
         in the fully qualified name.
         """
 
-        return FQTuple(
-            schema=db_object_identity(cls.on_table), object_name=cls.get_name()
-        )
+        return FQTuple(schema=db_object_identity(cls.on_table), object_name=cls.get_name())
 
     def __str__(self):
         return nodenamefmt(self.fq())
@@ -259,14 +241,19 @@ class SamizdatTrigger(Samizdat):
     @classmethod
     def drop(cls, if_exists=False):
         ident = db_object_identity(cls.on_table)
-        return f"""DROP {cls.entity_type.value} {"IF EXISTS" if if_exists else ""} {cls.get_name()} ON {ident} CASCADE;"""
+        return (
+            f"""DROP {cls.entity_type.value} {"IF EXISTS" if if_exists else ""} {cls.get_name()} ON {ident} CASCADE;"""
+        )
 
     @classmethod
     def sign(cls, cursor: Mogrifier):
-        return cursor.mogrify(
+        comment = cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} "{cls.get_name()}" ON {db_object_identity(cls.on_table)} IS %s;""",
             (cls.dbinfo(),),
         )
+        if isinstance(comment, bytes):
+            return comment.decode()
+        return comment
 
     @classmethod
     def head_id(cls):
@@ -289,12 +276,8 @@ class SamizdatMaterializedView(Samizdat, HasRefreshTriggers):
 
     @classmethod
     def refresh(cls, concurrent_allowed=True):
-        concurrently = (
-            "CONCURRENTLY" if (concurrent_allowed and cls.refresh_concurrently) else ""
-        )
-        return (
-            f"""REFRESH MATERIALIZED VIEW {concurrently} {cls.db_object_identity()};"""
-        )
+        concurrently = "CONCURRENTLY" if (concurrent_allowed and cls.refresh_concurrently) else ""
+        return f"""REFRESH MATERIALIZED VIEW {concurrently} {cls.db_object_identity()};"""
 
     @classmethod
     def gen_refresh_triggerfunction(cls):

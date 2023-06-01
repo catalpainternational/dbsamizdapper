@@ -16,22 +16,13 @@ from django.db.migrations import (
 from django.db.models.signals import post_migrate, pre_migrate
 
 from .libdb import dbstate_equals_definedstate
-from .libgraph import (
-    depsort_with_sidekicks,
-    sanity_check,
-    subtree_depends,
-    unmanaged_refs,
-)
+from .libgraph import depsort_with_sidekicks, sanity_check, subtree_depends, unmanaged_refs
 from .loader import get_samizdats
 from .runner import ArgType, cmd_nuke, cmd_sync, get_cursor, txstyle
 from .util import fqify_node
 
-DBCONN = (
-    "default"  # Only migrations on the default DB connections are supported. For now.
-)
-SMART_MIGRATIONS = getattr(
-    settings, "DBSAMIZDAT_SMART_MIGRATIONS", False
-)  # Don't use with custom Operations!
+DBCONN = "default"  # Only migrations on the default DB connections are supported. For now.
+SMART_MIGRATIONS = getattr(settings, "DBSAMIZDAT_SMART_MIGRATIONS", False)  # Don't use with custom Operations!
 style = color_style()
 
 

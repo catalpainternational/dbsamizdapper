@@ -97,9 +97,7 @@ class ProtoSamizdat(HasFQ, HasFQify):
         name = cls.get_name()
         for char in name:
             if ord(char) > 0x7F:
-                raise UnsuitableNameError(
-                    "Name contains non-ASCII characters", samizdat=cls
-                )
+                raise UnsuitableNameError("Name contains non-ASCII characters", samizdat=cls)
         # Technically we could UESCAPE these,
         # and make the length calculation much more complicated.
         if len(name) > PG_IDENTIFIER_MAXLEN:
@@ -186,7 +184,7 @@ class Mogrifier(Protocol):
     """
 
     @abstractmethod
-    def mogrify(self, *args, **kwargs) -> str:
+    def mogrify(self, *args, **kwargs) -> str | bytes:
         ...
 
     @property
