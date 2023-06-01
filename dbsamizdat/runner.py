@@ -10,7 +10,7 @@ from typing import Generator, Iterable, Literal, Type
 
 from dbsamizdat.samizdat import Samizdat, SamizdatMaterializedView
 
-from .samtypes import ProtoSamizdat, entitypes
+from .samtypes import ProtoSamizdat, entitypes, Cursor
 from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
 from .libdb import (
@@ -24,7 +24,6 @@ from .util import fqify_node, nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
     from argparse import ArgumentParser
-    from psycopg import ClientCursor
 
 dotenv.load_dotenv()
 
@@ -78,7 +77,7 @@ def timer() -> Generator[float, None, None]:
         last = cur
 
 
-def get_cursor(args: ArgType) -> "ClientCursor":
+def get_cursor(args: ArgType) -> Cursor:
     """
     Returns a psycopg or Django cursor
     """
@@ -103,7 +102,7 @@ def get_cursor(args: ArgType) -> "ClientCursor":
     return cursor
 
 
-def txi_finalize(cursor: "ClientCursor", args: ArgType):
+def txi_finalize(cursor: Cursor, args: ArgType):
     """
     Executes a ROLLBACK if we're doing a dry run else a COMMIT
     """
@@ -276,7 +275,7 @@ def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
 def executor(
     yielder: Iterable[tuple[ACTION, Samizdat | Type[ProtoSamizdat], str]],
     args: ArgType,
-    cursor: "ClientCursor",
+    cursor: Cursor,
     max_namelen=0,
     timing=False,
 ):

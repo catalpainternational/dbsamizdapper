@@ -1,12 +1,8 @@
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Iterable, NamedTuple, Protocol
-import typing
 
 from dbsamizdat.exceptions import UnsuitableNameError
-
-if typing.TYPE_CHECKING:
-    from psycopg import Cursor, ClientCursor  # noqa: F401
 
 PG_IDENTIFIER_MAXLEN = 63
 PG_IDENTIFIER_VERBOTEN = set('"')
@@ -36,20 +32,6 @@ class FQTuple(NamedTuple):
     args: str | None = None
 
 
-class Mogrifier(Protocol):
-    """
-    A class which can "mogrify" a SQL string
-    """
-
-    @abstractmethod
-    def mogrify(self, *args, **kwargs) -> str:
-        ...
-
-    @property
-    def connection(self) -> Any:
-        ...
-
-
 class HasFQ(Protocol):
     """
     Ability to "fully qualify" oneself as a postgres instance
@@ -64,8 +46,6 @@ objectname = str
 schemaname = str
 sql_query = str
 # Already a "FQ"; or, something which can give its own FQ
-database_object = objectname | tuple[schemaname, objectname] | FQTuple | HasFQ
-set_of_database_objects = set[database_object]
 
 
 class HasFQify(Protocol):
@@ -79,7 +59,7 @@ class HasRefreshTriggers(HasFQ, HasFQify):
     Optional extras for refreshing a view on table changes
     """
 
-    refresh_triggers: set_of_database_objects = set()
+    refresh_triggers: set["FQIffable"] = set()
 
     @classmethod
     def fqrefresh_triggers(cls):
@@ -87,8 +67,8 @@ class HasRefreshTriggers(HasFQ, HasFQify):
 
 
 class ProtoSamizdat(HasFQ, HasFQify):
-    deps_on: set_of_database_objects = set()
-    deps_on_unmanaged: set_of_database_objects = set()
+    deps_on: set["FQIffable"] = set()
+    deps_on_unmanaged: set["FQIffable"] = set()
     schema: schemaname | None = "public"
     sql_template: sql_query = """
         -- There should be a class-dependent body for ${samizdatname} here.
@@ -160,7 +140,7 @@ class ProtoSamizdat(HasFQ, HasFQify):
 
     @classmethod
     @abstractmethod
-    def sign(cls, cursor: Mogrifier) -> sql_query:
+    def sign(cls, cursor: "Mogrifier") -> sql_query:
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
@@ -198,3 +178,33 @@ class ProtoSamizdat(HasFQ, HasFQify):
 
 
 FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | tuple[str, ...]
+
+
+class Mogrifier(Protocol):
+    """
+    A class which can "mogrify" a SQL string
+    """
+
+    @abstractmethod
+    def mogrify(self, *args, **kwargs) -> str:
+        ...
+
+    @property
+    def connection(self) -> Any:
+        ...
+
+
+class Cursor(Mogrifier):
+    """
+    Approximately define what you need in a 'cursor' class
+    """
+
+    def execute(self, str) -> None:
+        ...
+
+    def close(self) -> None:
+        ...
+
+    @abstractmethod
+    def fetchall(self) -> list:
+        ...

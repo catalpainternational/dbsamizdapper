@@ -3,10 +3,7 @@ from json import loads as jsonloads
 from typing import TYPE_CHECKING, Iterable, NamedTuple, Type
 import warnings
 
-from .samtypes import ProtoSamizdat, entitypes
-
-if TYPE_CHECKING:
-    from psycopg import ClientCursor
+from .samtypes import ProtoSamizdat, entitypes, Cursor
 
 from dbsamizdat.samizdat import Samizdat
 
@@ -39,7 +36,7 @@ class StateTuple(NamedTuple):
 
 
 def get_dbstate(
-    cursor: "ClientCursor",
+    cursor: "Cursor",
 ) -> Iterable[StateTuple]:
     """
     Capture and annotate the current DB state (functions, views and triggers)
@@ -178,7 +175,7 @@ class DBComparison(NamedTuple):
     excess_definedstate: Iterable[Samizdat]
 
 
-def dbstate_equals_definedstate(cursor: "ClientCursor", samizdats: Iterable[Samizdat]):
+def dbstate_equals_definedstate(cursor: Cursor, samizdats: Iterable[Samizdat]):
     """
     Returns whether there are id's to add or remove and if so which
     samizdat classes (by id) need to be added or removed to sync database

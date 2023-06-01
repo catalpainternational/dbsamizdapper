@@ -108,10 +108,6 @@ class Samizdat(ProtoSamizdat):
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
         """
-        if not hasattr(cursor, "mogrify"):
-            from psycopg import ClientCursor
-
-            return str(cls.sign(ClientCursor(cursor.connection)))
         return cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
             (cls.dbinfo(),),
@@ -267,10 +263,6 @@ class SamizdatTrigger(Samizdat):
 
     @classmethod
     def sign(cls, cursor: Mogrifier):
-        if not hasattr(cursor, "mogrify"):
-            from psycopg import ClientCursor
-
-            return cls.sign(ClientCursor(cursor.connection))
         return cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} "{cls.get_name()}" ON {db_object_identity(cls.on_table)} IS %s;""",
             (cls.dbinfo(),),
