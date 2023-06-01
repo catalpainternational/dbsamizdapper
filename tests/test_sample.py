@@ -81,6 +81,7 @@ def test_code_generation():
     """
     Assert that code generation raises no errors
     """
+    args = ArgType(txdiscipline="jumbo")
     AnotherThing.create()
     AnotherThing.drop()
     MaterializedThing.create()
@@ -97,8 +98,8 @@ def test_code_generation():
     AnotherThing.fqdeps_on_unmanaged()
     AnotherThing.dbinfo()
     # These SQL-generating functions require a cursor
-    with psycopg.connect(DEFAULT_URL).cursor() as c:
-        AnotherThing.sign(c)
+    with get_cursor(args) as cursor:
+        AnotherThing.sign(cursor)
 
     AnotherThing.create()
     AnotherThing.drop()
@@ -114,11 +115,10 @@ def test_code_generation():
     assert DealFruitFunWithName.fq() == FQTuple("public", "DealFruitFun", "name text")
     assert MaterializedThing.fqdeps_on() == {FQTuple("public", "AnotherThing")}
 
-    args = ArgType(txdiscipline="jumbo")
-
     db_object_identity(DealFruitFunWithName)
-    assert DealFruitFunWithName.sign(get_cursor(args)) != DealFruitFun.sign(
-        get_cursor(args)
+    with get_cursor(args) as cursor:
+        assert DealFruitFunWithName.sign(cursor) != DealFruitFun.sign(
+        cursor
     )
 
 
@@ -126,16 +126,14 @@ def test_create_view():
     args = ArgType(txdiscipline="jumbo")
 
     # What are the dependencies of `MaterializedThing`?
-    cursor = get_cursor(args)
-    cursor.execute(fruittable_SQL)
-    cursor.execute("COMMIT;")
-    cursor.close()
+    with get_cursor(args) as cursor:
+        cursor.execute(fruittable_SQL)
 
     cmd_sync(args)
-    cursor = get_cursor(args)
-    cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
-    cursor.fetchall()
-    cursor.close()
+
+    with get_cursor(args) as cursor:
+        cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
+        cursor.fetchall()
 
     # All dbszmizdats should be registered now
 
@@ -143,23 +141,18 @@ def test_create_view():
 
     dot(samizdats)
 
-    cursor = get_cursor(args)
-
-    current_state = get_dbstate(cursor)
-    (dbinfo_to_class(s) for s in current_state)
-
-    try:
+    with get_cursor(args) as cursor:
+        current_state = get_dbstate(cursor)
+        (dbinfo_to_class(s) for s in current_state)
         get_dbstate(cursor)
         # We've just done a sync so dbstate should equal defined state
         assert dbstate_equals_definedstate(cursor, samizdats).issame
-    finally:
-        cursor.close()
+
 
     cmd_sync(args)
     cmd_nuke(args)
-    cursor = get_cursor(args)
-    # Now we expect this to raise an error
-    with pytest.raises(Exception):
-        cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
-        cursor.fetchall()
-    cursor.close()
+    with get_cursor(args) as cursor:
+        # Now we expect this to raise an error
+        with pytest.raises(Exception):
+            cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
+            cursor.fetchall()

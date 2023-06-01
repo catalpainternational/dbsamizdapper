@@ -1,4 +1,5 @@
 import argparse
+from contextlib import contextmanager
 import os
 import dotenv
 import sys
@@ -77,15 +78,17 @@ def timer() -> Generator[float, None, None]:
         last = cur
 
 
-def get_cursor(args: ArgType) -> Cursor:
+@contextmanager
+def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     """
     Returns a psycopg or Django cursor
     """
-    cursor = None
     if args.in_django:
         from django.db import connections
-
         cursor = connections[args.dbconn].cursor().cursor
+        cursor.execute("BEGIN;")
+        yield cursor
+
     else:
         try:
             import psycopg  # noqa: F811
@@ -93,13 +96,18 @@ def get_cursor(args: ArgType) -> Cursor:
             raise ImportError("Running standalone requires psycopg") from E
         try:
             if args.dburl:
-                cursor = psycopg.connect(args.dburl).cursor()
+                conn = psycopg.connect(args.dburl)
+                cursor = psycopg.ClientCursor(conn)
+                assert hasattr(cursor, 'mogrify')
             else:
                 raise NotImplementedError("No dburl provided: nothing to do!")
         except psycopg.OperationalError as E:
             raise Exception(f"URL did not connect: {args.dburl}") from E
-    cursor.execute("BEGIN;")  # And so it begins…
-    return cursor
+        cursor.execute("BEGIN;")  # And so it begins…
+        yield cursor
+
+    txi_finalize(cursor, args)
+    cursor.close()
 
 
 def txi_finalize(cursor: Cursor, args: ArgType):
@@ -116,123 +124,119 @@ def txi_finalize(cursor: Cursor, args: ArgType):
 
 
 def cmd_refresh(args: ArgType):
-    cursor = get_cursor(args)
-    samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
-    matviews: list[SamizdatMaterializedView] = [
-        sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW
-    ]
+    with get_cursor(args) as cursor:
+        samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+        matviews: list[SamizdatMaterializedView] = [
+            sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW
+        ]
 
-    if args.belownodes:
-        rootnodes = {fqify_node(rootnode) for rootnode in args.belownodes}
-        allnodes = node_dump(samizdats)
-        if rootnodes - allnodes:
-            raise ValueError(
-                """Unknown rootnodes:\n\t- %s"""
-                % "\n\t- ".join(
-                    [nodenamefmt(rootnode) for rootnode in rootnodes - allnodes]
+        if args.belownodes:
+            rootnodes = {fqify_node(rootnode) for rootnode in args.belownodes}
+            allnodes = node_dump(samizdats)
+            if rootnodes - allnodes:
+                raise ValueError(
+                    """Unknown rootnodes:\n\t- %s"""
+                    % "\n\t- ".join(
+                        [nodenamefmt(rootnode) for rootnode in rootnodes - allnodes]
+                    )
                 )
-            )
-        subtree_bundle = subtree_depends(samizdats, rootnodes)
-        matviews = [sd for sd in matviews if sd in subtree_bundle]
+            subtree_bundle = subtree_depends(samizdats, rootnodes)
+            matviews = [sd for sd in matviews if sd in subtree_bundle]
 
-    max_namelen = max(len(str(ds)) for ds in matviews)
+        max_namelen = max(len(str(ds)) for ds in matviews)
 
-    def refreshes():
-        for sd in matviews:
-            yield "refresh", sd, sd.refresh(concurrent_allowed=True)
+        def refreshes():
+            for sd in matviews:
+                yield "refresh", sd, sd.refresh(concurrent_allowed=True)
 
-    executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
-    txi_finalize(cursor, args)
+        executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
 def cmd_sync(args: ArgType):
     samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
 
-    cursor = get_cursor(args)
+    with get_cursor(args) as cursor:
 
-    db_compare = dbstate_equals_definedstate(cursor, samizdats)
-    if db_compare.issame:
-        vprint(args, "No differences, nothing to do.")
-        return
-    max_namelen = max(
-        len(str(ds))
-        for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
-    )
-    if db_compare.excess_dbstate:
-
-        def drops():
-            for sd in db_compare.excess_dbstate:
-                yield "drop", sd, sd.drop(if_exists=True)
-                # we don't know the deptree; so they may have vanished
-                # through a cascading drop of a previous object
-
-        executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
-        # again, we don't know the in-db deptree, so we need to re-read DB
-        # state as the rug may have been pulled out from under us with cascading
-        # drops
-    if db_compare.excess_definedstate:
+        if db_compare.issame:
+            vprint(args, "No differences, nothing to do.")
+            return
+        max_namelen = max(
+            len(str(ds))
+            for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
+        )
+        if db_compare.excess_dbstate:
 
-        def creates():
-            to_create_ids = {sd.head_id() for sd in db_compare.excess_definedstate}
-            for sd in samizdats:  # iterate in proper creation order
-                if sd.head_id() not in to_create_ids:
-                    continue
-                yield "create", sd, sd.create()
-                yield "sign", sd, sd.sign(cursor)
+            def drops():
+                for sd in db_compare.excess_dbstate:
+                    yield "drop", sd, sd.drop(if_exists=True)
+                    # we don't know the deptree; so they may have vanished
+                    # through a cascading drop of a previous object
 
-        executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
+            executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
+            db_compare = dbstate_equals_definedstate(cursor, samizdats)
+            # again, we don't know the in-db deptree, so we need to re-read DB
+            # state as the rug may have been pulled out from under us with cascading
+            # drops
+        if db_compare.excess_definedstate:
 
-        matviews_to_refresh = {
-            sd.head_id()
-            for sd in db_compare.excess_definedstate
-            if sd.entity_type == entitypes.MATVIEW
-        }
-        if matviews_to_refresh:
-
-            def refreshes():
+            def creates():
+                to_create_ids = {sd.head_id() for sd in db_compare.excess_definedstate}
                 for sd in samizdats:  # iterate in proper creation order
-                    if sd.head_id() in matviews_to_refresh:
-                        yield "refresh", sd, sd.refresh(concurrent_allowed=False)
+                    if sd.head_id() not in to_create_ids:
+                        continue
+                    yield "create", sd, sd.create()
+                    yield "sign", sd, sd.sign(cursor)
 
-            executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
-    txi_finalize(cursor, args)
-    cursor.close()
+            executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
+
+            matviews_to_refresh = {
+                sd.head_id()
+                for sd in db_compare.excess_definedstate
+                if sd.entity_type == entitypes.MATVIEW
+            }
+            if matviews_to_refresh:
+
+                def refreshes():
+                    for sd in samizdats:  # iterate in proper creation order
+                        if sd.head_id() in matviews_to_refresh:
+                            yield "refresh", sd, sd.refresh(concurrent_allowed=False)
+
+                executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
 def cmd_diff(args: ArgType):
-    cursor = get_cursor(args)
-    samizdats: list[Samizdat] = depsort_with_sidekicks(sanity_check(get_samizdats()))
-    db_compare = dbstate_equals_definedstate(cursor, samizdats)
-    if db_compare.issame:
-        vprint(args, "No differences.")
-        exit(0)
+    with get_cursor(args) as cursor:
+        samizdats: list[Samizdat] = depsort_with_sidekicks(sanity_check(get_samizdats()))
+        db_compare = dbstate_equals_definedstate(cursor, samizdats)
+        if db_compare.issame:
+            vprint(args, "No differences.")
+            exit(0)
 
-    max_namelen = max(
-        len(str(ds))
-        for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
-    )
-
-    def statefmt(state: Iterable[ProtoSamizdat], prefix):
-        return "\n".join(
-            f"%s%-17s\t%-{max_namelen}s\t%s"
-            % (prefix, sd.entity_type.value, sd, sd.definition_hash())
-            for sd in sorted(state, key=lambda sd: str(sd))
+        max_namelen = max(
+            len(str(ds))
+            for ds in db_compare.excess_dbstate | db_compare.excess_definedstate
         )
 
-    if db_compare.excess_dbstate:
-        vprint(
-            args,
-            statefmt(db_compare.excess_dbstate, "Not in samizdats:\t"),
-            file=sys.stdout,
-        )
-    if db_compare.excess_definedstate:
-        vprint(
-            args,
-            statefmt(db_compare.excess_definedstate, "Not in database:   \t"),
-            file=sys.stdout,
-        )
-    cursor.close()
+        def statefmt(state: Iterable[ProtoSamizdat], prefix):
+            return "\n".join(
+                f"%s%-17s\t%-{max_namelen}s\t%s"
+                % (prefix, sd.entity_type.value, sd, sd.definition_hash())
+                for sd in sorted(state, key=lambda sd: str(sd))
+            )
+
+        if db_compare.excess_dbstate:
+            vprint(
+                args,
+                statefmt(db_compare.excess_dbstate, "Not in samizdats:\t"),
+                file=sys.stdout,
+            )
+        if db_compare.excess_definedstate:
+            vprint(
+                args,
+                statefmt(db_compare.excess_definedstate, "Not in database:   \t"),
+                file=sys.stdout,
+            )
 
     # Exit code depends on the database state and
     # defined state
@@ -252,24 +256,22 @@ def cmd_printdot(args: ArgType):
 
 
 def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
-    cursor = get_cursor(args)
+    with get_cursor(args) as cursor:
 
-    def nukes():
-        # If "samizdats" is not defined fetch from the database
+        def nukes():
+            # If "samizdats" is not defined fetch from the database
 
-        if samizdats is not None:
-            yield from (("nuke", sd, sd.drop(if_exists=True)) for sd in samizdats)
+            if samizdats is not None:
+                yield from (("nuke", sd, sd.drop(if_exists=True)) for sd in samizdats)
 
-        # If "samizdats" is not defined fetch from the database
-        for state in get_dbstate(cursor):
-            if state.commentcontent is None:
-                continue
-            sd = dbinfo_to_class(state)
-            yield ("nuke", sd, sd.drop(if_exists=True))
+            # If "samizdats" is not defined fetch from the database
+            for state in get_dbstate(cursor):
+                if state.commentcontent is None:
+                    continue
+                sd = dbinfo_to_class(state)
+                yield ("nuke", sd, sd.drop(if_exists=True))
 
-    executor(nukes(), args, cursor)
-    txi_finalize(cursor, args)
-    cursor.close()
+        executor(nukes(), args, cursor)
 
 
 def executor(
