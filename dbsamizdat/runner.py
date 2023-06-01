@@ -119,8 +119,10 @@ def txi_finalize(cursor: Cursor, args: ArgType):
         final_clause = "COMMIT;"
     elif args.txdiscipline == "dryrun":
         final_clause = "ROLLBACK;"
+    elif args.txdiscipline == "checkpoint":
+        final_clause = "COMMIT;"
     else:
-        raise KeyError("Expected one of COMMIT or ROLLBACK")
+        raise KeyError(f"Expected one of 'jumbo' or 'dryrun'; got {args.txdiscipline}")
     cursor.execute(final_clause)
 
 
@@ -140,7 +142,7 @@ def cmd_refresh(args: ArgType):
             subtree_bundle = subtree_depends(samizdats, rootnodes)
             matviews = [sd for sd in matviews if sd in subtree_bundle]
 
-        max_namelen = max(len(str(ds)) for ds in matviews)
+        max_namelen = max(len(str(ds)) for ds in matviews) if len(matviews) else 50
 
         def refreshes():
             for sd in matviews:
@@ -307,7 +309,7 @@ def executor(
         except Exception as dberr:
             raise DatabaseError(f"{action_totake} failed", dberr, sd, sql)
         cursor.execute(f"RELEASE SAVEPOINT action_{action_totake};")
-        if action_totake != "create":
+        if args.txdiscipline == txstyle.CHECKPOINT.value and action_totake != "create":
             # only commit *after* signing, otherwise if later the signing somehow fails
             # we'll have created an orphan DB object that we don't recognize as ours
             cursor.execute("COMMIT;")
