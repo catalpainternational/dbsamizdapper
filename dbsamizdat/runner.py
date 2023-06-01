@@ -17,7 +17,7 @@ from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
 from .libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
-from .loader import get_samizdats
+from .loader import get_samizdats, autodiscover_samizdats
 from .samtypes import Cursor, ProtoSamizdat, entitypes
 from .util import fqify_node, nodenamefmt, sqlfmt
 
@@ -40,11 +40,11 @@ PRINTKWARGS = dict(file=sys.stderr, flush=True)
 
 
 class ArgType(argparse.Namespace):
-    txdiscipline: Literal["checkpoint", "jumbo", "dryrun"] = "dryrun"
+    txdiscipline: Literal["checkpoint", "jumbo", "dryrun"] | None = "dryrun"
     verbosity: int = 1
     belownodes: Iterable[str] = []
     in_django: bool = False
-    log_rather_than_print: bool = False
+    log_rather_than_print: bool = True
     dbconn: str = "default"
     dburl: str | None = os.environ.get("DBURL")
 
@@ -53,16 +53,7 @@ def vprint(args: ArgType, *pargs, **pkwargs):
     if args.log_rather_than_print:
         logger.info(" ".join(map(str, pargs)))
     elif args.verbosity:
-        print(*pargs)
-        print({**PRINTKWARGS, **pkwargs})
-
-
-def vvprint(args: ArgType, *pargs, **pkwargs):
-    if args.log_rather_than_print:
-        logger.debug(" ".join(map(str, pargs)))
-    elif args.verbosity > 1:
-        print(*pargs)
-        print({**PRINTKWARGS, **pkwargs})
+        print(*pargs, **PRINTKWARGS, **pkwargs)
 
 
 def timer() -> Generator[float, None, None]:
@@ -75,6 +66,14 @@ def timer() -> Generator[float, None, None]:
         yield (cur - last)
         last = cur
 
+
+def get_sds(in_django: bool = False):
+    if in_django:
+        sds = list(autodiscover_samizdats())
+    else:
+        sds = get_samizdats()
+    sanity_check(sds)
+    return depsort_with_sidekicks(sds)
 
 @contextmanager
 def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
@@ -106,29 +105,28 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
 
     cursor.execute("BEGIN;")
     yield cursor
-
-    txi_finalize(cursor, args)
+    txi_finalize(cursor, getattr(args, "txdiscipline", "dryrun"))
     cursor.close()
 
 
-def txi_finalize(cursor: Cursor, args: ArgType):
+def txi_finalize(cursor: Cursor, txdiscipline: Literal["jumbo", "dryrun", "checkpoint"]):
     """
     Executes a ROLLBACK if we're doing a dry run else a COMMIT
     """
-    if args.txdiscipline == "jumbo":
+    if txdiscipline == "jumbo":
         final_clause = "COMMIT;"
-    elif args.txdiscipline == "dryrun":
+    elif txdiscipline == "dryrun":
         final_clause = "ROLLBACK;"
-    elif args.txdiscipline == "checkpoint":
+    elif txdiscipline == "checkpoint":
         final_clause = "COMMIT;"
     else:
-        raise KeyError(f"Expected one of 'jumbo' or 'dryrun'; got {args.txdiscipline}")
+        raise KeyError(f"Expected one of 'jumbo' or 'dryrun' or 'checkpoint'; got {txdiscipline}")
     cursor.execute(final_clause)
 
 
 def cmd_refresh(args: ArgType):
     with get_cursor(args) as cursor:
-        samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+        samizdats = get_sds(args.in_django)
         matviews: list[SamizdatMaterializedView] = [sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW]
 
         if args.belownodes:
@@ -152,7 +150,7 @@ def cmd_refresh(args: ArgType):
 
 
 def cmd_sync(args: ArgType):
-    samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+    samizdats = get_sds(args.in_django)
 
     with get_cursor(args) as cursor:
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
@@ -200,7 +198,7 @@ def cmd_sync(args: ArgType):
 
 def cmd_diff(args: ArgType):
     with get_cursor(args) as cursor:
-        samizdats: list[Samizdat] = depsort_with_sidekicks(sanity_check(get_samizdats()))
+        samizdats = get_sds(args.in_django)
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
         if db_compare.issame:
             vprint(args, "No differences.")
@@ -218,13 +216,11 @@ def cmd_diff(args: ArgType):
             vprint(
                 args,
                 statefmt(db_compare.excess_dbstate, "Not in samizdats:\t"),
-                file=sys.stdout,
             )
         if db_compare.excess_definedstate:
             vprint(
                 args,
                 statefmt(db_compare.excess_definedstate, "Not in database:   \t"),
-                file=sys.stdout,
             )
 
     # Exit code depends on the database state and
@@ -241,7 +237,7 @@ def cmd_diff(args: ArgType):
 
 
 def cmd_printdot(args: ArgType):
-    print("\n".join(dot(depsort_with_sidekicks(sanity_check(get_samizdats())))))
+    print("\n".join(dot(get_sds(args.in_django))))
 
 
 def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
@@ -283,7 +279,7 @@ def executor(
                 f"%-7s %-17s %-{max_namelen}s ..." % (action_totake, sd.entity_type.value, sd),
                 end="",
             )
-            vvprint(args, f"\n\n{sqlfmt(sql)}\n\n")
+            vprint(args, f"\n\n{sqlfmt(sql)}\n\n")
 
     action_cnt = 0
     for ix, progress in enumerate(yielder):

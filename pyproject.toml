@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dbsamizdat"
-version = "0.1.1"
+version = "0.1.3"
 description = ""
 authors = ["Josh Brooks <josh@catalpa.io>"]
 readme = "README.md"
