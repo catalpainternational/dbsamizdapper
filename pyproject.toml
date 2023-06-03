@@ -5,6 +5,10 @@ description = ""
 authors = ["Josh Brooks <josh@catalpa.io>",]
 readme = "README.md"
 
+packages = [
+    { include = "dbsamizdat" },
+]
+
 exclude = [
     { path = "tests/"},
     { path = "sample_app/"}
