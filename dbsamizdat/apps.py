@@ -15,11 +15,12 @@ from django.db.migrations import (
 )
 from django.db.models.signals import post_migrate, pre_migrate
 
+from dbsamizdat.samtypes import FQTuple
+
 from .libdb import dbstate_equals_definedstate
 from .libgraph import depsort_with_sidekicks, sanity_check, subtree_depends, unmanaged_refs
 from .loader import get_samizdats
 from .runner import ArgType, cmd_nuke, cmd_sync, get_cursor, txstyle
-from .util import fqify_node
 
 DBCONN = "default"  # Only migrations on the default DB connections are supported. For now.
 SMART_MIGRATIONS = getattr(settings, "DBSAMIZDAT_SMART_MIGRATIONS", False)  # Don't use with custom Operations!
@@ -100,7 +101,7 @@ def tables_affected_by(apps, plan):
                     AlterModelTable,
                 ),
             ):
-                tables_affected.add(fqify_node(model_meta.db_table))
+                tables_affected.add(FQTuple.fqify(model_meta.db_table))
     return (False, tables_affected)
 
 
@@ -113,7 +114,7 @@ def premigrate_handler(sender, **kwargs):
         nuke(**kwargs)
         return
 
-    samizdats = depsort_with_sidekicks(sanity_check(get_samizdats()))
+    samizdats = list(depsort_with_sidekicks(sanity_check(get_samizdats())))
     db_compare = dbstate_equals_definedstate(get_django_cursor(), samizdats)
     if not db_compare.issame:
         # There's unsynced samizdat state, and we can't tell if

@@ -6,10 +6,10 @@ from operator import or_
 
 from toposort import CircularDependencyError, toposort
 
-from dbsamizdat.samizdat import Samizdat
+from dbsamizdat.samizdat import Samizdat, SamizdatWithSidekicks
 
 from .exceptions import DanglingReferenceError, DependencyCycleError, NameClashError, TypeConfusionError
-from .samtypes import HasRefreshTriggers, ProtoSamizdat
+from .samtypes import ProtoSamizdat
 
 
 def gen_edges(samizdats: typing.Iterable[Samizdat]):
@@ -19,8 +19,11 @@ def gen_edges(samizdats: typing.Iterable[Samizdat]):
 
 
 def gen_autorefresh_edges(
-    samizdats: typing.Iterable[ProtoSamizdat | HasRefreshTriggers],
+    samizdats: typing.Iterable[Samizdat],
 ):
+    """
+    R
+    """
     for sd in samizdats:
         if hasattr(sd, "refresh_triggers"):
             yield (sd, sd.fq())
@@ -39,7 +42,7 @@ def node_dump(samizdats: typing.Iterable[Samizdat]):
     return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq()} for sd in samizdats))
 
 
-def unmanaged_refs(samizdats: typing.Iterable[Samizdat | HasRefreshTriggers]):
+def unmanaged_refs(samizdats: typing.Iterable[Samizdat | SamizdatWithSidekicks]):
     """
     All unmanaged nodes referenced
     """
@@ -91,40 +94,61 @@ def depsort(samizdats: typing.Iterable[Samizdat]):
     """
     samizdat_map = {sd.fq(): sd for sd in samizdats}
     depmap = {sd.fq(): sd.fqdeps_on() for sd in samizdats}
-
     toposorted = toposort(depmap)
 
-    return [samizdat_map[name] for name in chain(*(sorted(level) for level in toposorted))]
+    return [samizdat_map[name] for name in chain(*toposorted)]
 
 
 def depsort_with_sidekicks(samizdats: typing.Iterable[Samizdat]):
-    return list(chain(*(sd.and_sidekicks() for sd in depsort(samizdats))))
+    """
+    Injects "sidekicks" ino the topologically sorted
+    samizdats list
+    """
+    returns: list[ProtoSamizdat] = []
+    heads = {sd.head_id() for sd in samizdats}
+
+    for samizdat in depsort(samizdats):
+        returns.append(samizdat)
+        if hasattr(samizdat, "sidekicks"):
+            sd: SamizdatWithSidekicks = samizdat  # Declare the type for mypy
+            for kick in sd.sidekicks():
+                if kick.head_id() not in heads:
+                    returns.append(kick)
+                    heads.add(kick.head_id())
+    return returns
 
 
-def sanity_check(samizdats: typing.Iterable[Samizdat]):
+T = typing.TypeVar("T", bound=Samizdat)
+
+
+def sanity_check(samizdats: typing.Iterable[T]) -> typing.Iterable[T]:
+    """
+    Checks for a number of invalid conditions on the Samizdat tree
+    """
     for sd in samizdats:
+        # This raises an "UnsuitableNameError" if the
+        # "name" is something Postgres might not handle well
         sd.validate_name()
     sd_fqs = set(sd.fq() for sd in samizdats)
     sd_deps = set(chain(*(sd.fqdeps_on() for sd in samizdats)))
     sd_deps_unmanaged = set(chain(*(sd.deps_on_unmanaged for sd in samizdats)))
 
     # are there any classes with ambiguous DB identity?
-    if len(sd_fqs) < len(list(samizdats)):
-        cnt = Counter((sd.db_object_identity for sd in samizdats))
-        nonunique = [db_id for db_id, count in cnt.items() if count > 1]
-        if nonunique:
-            raise NameClashError("Non-unique DB entities specified: %s" % nonunique)
+    cnt = Counter((sd.db_object_identity() for sd in samizdats))
+    if nonunique := [db_id for db_id, count in cnt.items() if count > 1]:
+        raise NameClashError("Non-unique DB entities specified: %s" % nonunique)
+
     # check if all declared samizdat deps are present
-    if not sd_deps.issubset(sd_fqs):
-        raise DanglingReferenceError("Nonexistent dependencies referenced: %s" % (sd_deps - sd_fqs))
+    if undeclared := sd_deps - sd_fqs:
+        raise DanglingReferenceError(f"Nonexistent dependencies referenced: {undeclared}")
+
     # assert none of the declared unmanaged deps are declared samizdat
-    confused = sd_deps_unmanaged.intersection(sd_fqs)
-    if confused:
-        raise TypeConfusionError("Samizdat entity is also declared as *unmanaged* dependency: %s" % confused)
-    # cycle detection - top level
-    selfreffaulty = {sd for sd in samizdats if sd.fq() in sd.deps_on}
-    if selfreffaulty:
+    if confused := sd_deps_unmanaged.intersection(sd_fqs):
+        raise TypeConfusionError(f"Samizdat entity is also declared as *unmanaged* dependency: {confused}")
+
+    if selfreffaulty := {sd for sd in samizdats if sd.fq() in sd.fqdeps_on()}:
         raise DependencyCycleError("Self-referential dependency", (selfreffaulty.pop(),))
+
     # cycle detection - other levels; toposort will raise an exception if there's one
     sdfqmap = {sd.fq(): sd for sd in samizdats}
     try:

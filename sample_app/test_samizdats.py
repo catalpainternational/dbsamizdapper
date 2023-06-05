@@ -59,8 +59,13 @@ class DealFruitFun(SamizdatFunction):
 
 
 class DealFruitFunWithName(SamizdatFunction):
+    """
+    An example of a function which can take a "name".
+    This uses the same function name in postgres
+    """
+
     deps_on = {DealFruitFun}
-    function_name = "DealFruitFun"
+    function_name = DealFruitFun.get_name()
     function_arguments_signature = "name text"
     sql_template = f"""
         ${{preamble}}

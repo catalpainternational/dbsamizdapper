@@ -17,9 +17,9 @@ from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
 from .libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
-from .loader import get_samizdats, autodiscover_samizdats
-from .samtypes import Cursor, ProtoSamizdat, entitypes
-from .util import fqify_node, nodenamefmt, sqlfmt
+from .loader import autodiscover_samizdats, get_samizdats
+from .samtypes import Cursor, FQTuple, ProtoSamizdat, entitypes
+from .util import nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -53,7 +53,7 @@ def vprint(args: ArgType, *pargs, **pkwargs):
     if args.log_rather_than_print:
         logger.info(" ".join(map(str, pargs)))
     elif args.verbosity:
-        print(*pargs, **PRINTKWARGS, **pkwargs)
+        print(*pargs, **PRINTKWARGS, **pkwargs)  # type: ignore
 
 
 def timer() -> Generator[float, None, None]:
@@ -67,13 +67,25 @@ def timer() -> Generator[float, None, None]:
         last = cur
 
 
-def get_sds(in_django: bool = False):
-    if in_django:
-        sds = list(autodiscover_samizdats())
+def get_sds(in_django: bool = False, samizdats: Iterable[Samizdat] | None = None):
+    """
+    Samizdats may be defined by:
+     - A list
+     - "Autodiscovery"
+     - A Django module search
+    """
+    if samizdats:
+        sds = set(samizdats)
+    elif in_django:
+        sds = set(autodiscover_samizdats())
     else:
-        sds = get_samizdats()
+        sds = set(get_samizdats())
+
     sanity_check(sds)
-    return depsort_with_sidekicks(sds)
+    sorted_sds = list(depsort_with_sidekicks(sds))
+    sanity_check(sorted_sds)
+    return sorted_sds
+
 
 @contextmanager
 def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
@@ -130,7 +142,7 @@ def cmd_refresh(args: ArgType):
         matviews: list[SamizdatMaterializedView] = [sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW]
 
         if args.belownodes:
-            rootnodes = {fqify_node(rootnode) for rootnode in args.belownodes}
+            rootnodes = {FQTuple.fqify(rootnode) for rootnode in args.belownodes}
             allnodes = node_dump(samizdats)
             if rootnodes - allnodes:
                 raise ValueError(
@@ -149,14 +161,17 @@ def cmd_refresh(args: ArgType):
         executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
-def cmd_sync(args: ArgType):
-    samizdats = get_sds(args.in_django)
+def cmd_sync(args: ArgType, samizdatsIn: list[Samizdat] | None = None):
+    samizdats = tuple(get_sds(False, samizdatsIn)) or tuple(get_sds(args.in_django))
 
     with get_cursor(args) as cursor:
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
         if db_compare.issame:
             vprint(args, "No differences, nothing to do.")
             return
+
+        # Get the longest name from what's in the
+        # database and defined state
         max_namelen = max(len(str(ds)) for ds in db_compare.excess_dbstate | db_compare.excess_definedstate)
         if db_compare.excess_dbstate:
 
@@ -284,10 +299,7 @@ def executor(
     action_cnt = 0
     for ix, progress in enumerate(yielder):
         action_cnt += 1
-        try:
-            progressprint(ix, *progress)
-        except:
-            raise
+        progressprint(ix, *progress)
         action_totake, sd, sql = progress
         try:
             try:

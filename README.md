@@ -21,6 +21,21 @@ This fork is based on a rewrite which I did to better understand the internals o
 
 and probably many more undocumented changes
 
+
+## Running Tests
+
+Spin up a docker container
+
+`docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
+
+The db url for this container would be:
+
+"postgresql:///postgres@localhost:5435/postgres"
+
+Make this the environment variable `DB_URL`, or add it to the `.env` file
+
 ## Original README
 
 Check out the original readme for rationale and how-to documentation
+
+

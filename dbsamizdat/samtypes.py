@@ -1,6 +1,9 @@
-from abc import abstractmethod
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, NamedTuple, Protocol
+from typing import Any, Iterable, Type
 
 from dbsamizdat.exceptions import UnsuitableNameError
 
@@ -20,74 +23,140 @@ PG_IDENTIFIER_VERBOTEN = set('"')
 
 class entitypes(Enum):
     UNDEFINED = "UNDEFINED"
+    TABLE = "TABLE"
     VIEW = "VIEW"
     MATVIEW = "MATERIALIZED VIEW"
     FUNCTION = "FUNCTION"
     TRIGGER = "TRIGGER"
 
 
-class FQTuple(NamedTuple):
-    schema: str
-    object_name: str
-    args: str | None = None
-
-
-class HasFQ(Protocol):
+class HasFQ(ABC):
     """
     Ability to "fully qualify" oneself as a postgres instance
     """
 
     @classmethod
+    @abstractmethod
     def fq(cls) -> FQTuple:
         ...
+
+
+@dataclass(frozen=True)
+class FQTuple:
+    """
+    This dataclass converts different formats of fully qualified names
+    to a consistent class format for `DB object identification`
+    """
+
+    schema: str | None = "public"
+    object_name: str | None = None
+    args: str | None = None
+
+    def __lt__(self, other: FQTuple):
+        return self.db_object_identity() > other.db_object_identity()
+
+    def db_object_identity(self):
+        if self.args is not None:
+            return f'"{self.schema}"."{self.object_name}"({self.args})'
+        return f'"{self.schema}"."{self.object_name}"'
+
+    @classmethod
+    def fqify(cls, arg: FQIffable):
+        """
+        This is a constructor method
+        """
+        if isinstance(arg, FQTuple):
+            return arg
+
+        elif isinstance(arg, str):
+            return cls(schema="public", object_name=arg)
+
+        elif isinstance(arg, tuple):
+            """
+            Convert a 2tuple of schema, thing_name
+            """
+            if len(arg) == 1:
+                return cls(schema=arg[1])
+
+            if len(arg) == 2:
+                return cls(schema=arg[0], object_name=arg[1])
+
+            if len(arg) == 3:
+                return cls(schema=arg[0], object_name=arg[1], args=arg[2])
+
+        elif hasattr(arg, "fq"):
+            """
+            Convert a Samizdat like instance
+            """
+            return arg.fq()
+
+        else:
+            raise TypeError
 
 
 objectname = str
 schemaname = str
 sql_query = str
-# Already a "FQ"; or, something which can give its own FQ
 
 
-class HasFQify(Protocol):
+class SqlGeneration(ABC):
+    """
+    A class which can "sign" itself, "create", and "drop"
+    """
+
     @classmethod
-    def fqify(cls, ref: HasFQ) -> FQTuple:
+    @abstractmethod
+    def sign(cls, cursor: "Mogrifier") -> sql_query:
+        """
+        Generate COMMENT ON sql storing a signature
+        We need the cursor to let psycopg (2) properly escape our json-as-text-string.
+        """
+        ...
+
+    @classmethod
+    @abstractmethod
+    def create(cls) -> sql_query:
+        """
+        SQL to create this DB object
+        """
+        ...
+
+    @classmethod
+    @abstractmethod
+    def drop(cls, if_exists: bool) -> sql_query:
+        """
+        SQL to drop object. Cascade because we have no idea about the dependency tree.
+        """
         ...
 
 
-class HasRefreshTriggers(HasFQ, HasFQify):
+class HasRefreshTriggers(HasFQ):
     """
     Optional extras for refreshing a view on table changes
+    This automatically adds triggers for when a table refreshes to another MatView
     """
 
     refresh_triggers: set["FQIffable"] = set()
 
     @classmethod
     def fqrefresh_triggers(cls):
-        return {cls.fqify(trigger) for trigger in cls.refresh_triggers}
+        return {FQTuple.fqify(trigger) for trigger in cls.refresh_triggers}
 
 
-class ProtoSamizdat(HasFQ, HasFQify):
-    deps_on: set["FQIffable"] = set()
-    deps_on_unmanaged: set["FQIffable"] = set()
-    schema: schemaname | None = "public"
-    sql_template: sql_query = """
-        -- There should be a class-dependent body for ${samizdatname} here.
-        -- See README.md.
-        """
-    entity_type: entitypes
+class HasGetName(ABC):
+    """
+    This object can return a "Name" for itself and
+    will validate that this name is likely to be "nice" for
+    postgres to use
+    """
+
+    object_name: str | None = None
 
     @classmethod
-    @abstractmethod
     def get_name(cls) -> str:
-        return cls.__name__
+        return cls.object_name or cls.__name__
 
     @classmethod
-    @abstractmethod
-    def db_object_identity(cls) -> str:
-        ...
-
-    @classmethod
-    @abstractmethod
     def validate_name(cls):
         """
         Check whether name is a valid PostgreSQL identifier. Note that we'll quote
@@ -102,12 +171,31 @@ class ProtoSamizdat(HasFQ, HasFQify):
         # and make the length calculation much more complicated.
         if len(name) > PG_IDENTIFIER_MAXLEN:
             raise UnsuitableNameError("Name is too long", samizdat=cls)
-        if set(name) & PG_IDENTIFIER_VERBOTEN:
-            badchars = {set(name) & PG_IDENTIFIER_VERBOTEN}
+        if badchars := set(name) & PG_IDENTIFIER_VERBOTEN:
             raise UnsuitableNameError(
                 f"""Name contains unwelcome characters ({badchars})""",
                 samizdat=cls,
             )
+
+
+class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
+    """
+    A Samizdat class has abilities to create SQL and
+    describe itself using a fully qualified name
+    """
+
+    deps_on: set[FQIffable] = set()
+    deps_on_unmanaged: set[FQIffable] = set()
+    schema: schemaname | None = "public"
+    sql_template: sql_query = """
+        -- There should be a class-dependent body for ${samizdatname} here.
+        -- See README.md.
+        """
+    entity_type: entitypes
+
+    @classmethod
+    def db_object_identity(cls) -> str:
+        return cls.fq().db_object_identity()
 
     @classmethod
     @abstractmethod
@@ -138,49 +226,30 @@ class ProtoSamizdat(HasFQ, HasFQify):
 
     @classmethod
     @abstractmethod
-    def sign(cls, cursor: "Mogrifier") -> sql_query:
-        """
-        Generate COMMENT ON sql storing a signature
-        We need the cursor to let psycopg (2) properly escape our json-as-text-string.
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def create(cls) -> sql_query:
-        """
-        SQL to create this DB object
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def drop(cls, if_exists: bool) -> sql_query:
-        """
-        SQL to drop object. Cascade because we have no idea about the dependency tree.
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def and_sidekicks(cls) -> Iterable["ProtoSamizdat"]:
-        """
-        On some classes, this will yield autogenerated sidekick classes
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
     def head_id(cls) -> str:
         ...
 
 
-FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | tuple[str, ...]
+FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | Type[ProtoSamizdat] | tuple[str, ...]
 
 
-class Mogrifier(Protocol):
+class HasSidekicks(ABC):
+    """
+    Some Samizdat classes have additional
+    triggers or functions
+    One example is Materialized Views with `refresh_triggers`
+    """
+
+    @classmethod
+    @abstractmethod
+    def sidekicks(cls) -> Iterable["ProtoSamizdat"]:
+        ...
+
+
+class Mogrifier(ABC):
     """
     A class which can "mogrify" a SQL string
+    This helps to differentiate between psycopg & pscyopg2 'Cursur
     """
 
     @abstractmethod

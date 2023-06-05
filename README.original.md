@@ -365,13 +365,3 @@ The disadvantage of the trigger approach is that what used to (probably) be a fa
 In either case, to prevent holding out readers while refreshing a materialized view, you could investigate whether you can turn on concurrent refreshes.
 
 Depending on write flux, consistency requirements, and sheer computational demands, there are certainly cases for which neither signals nor triggers are a good fit, and a nightly batch process would work better, perhaps not even using materialized views at all.
-
-## Running Tests
-
-Spin up a docker container
-
-`docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
-
-The db url for this container would be:
-
-"postgresql:///postgres@localhost:5435/postgres"

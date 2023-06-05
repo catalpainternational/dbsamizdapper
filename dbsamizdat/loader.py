@@ -1,18 +1,28 @@
 import inspect
+from abc import ABC
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
 from typing import Iterable
 
-from dbsamizdat.samizdat import Samizdat, SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
+from dbsamizdat.samizdat import (
+    Samizdat,
+    SamizdatFunction,
+    SamizdatMaterializedView,
+    SamizdatTrigger,
+    SamizdatView,
+    SamizdatWithSidekicks,
+)
 from dbsamizdat.samtypes import ProtoSamizdat
 
 excludelist = {
     Samizdat,
+    SamizdatWithSidekicks,
     SamizdatFunction,
     SamizdatView,
     SamizdatMaterializedView,
     SamizdatTrigger,
+    ABC,
 }
 
 logger = getLogger(__name__)
@@ -29,7 +39,14 @@ def get_samizdats() -> set[Samizdat]:
     def all_subclasses(cls):
         return set(cls.__subclasses__()).union([s for c in cls.__subclasses__() for s in all_subclasses(c)])
 
-    return all_subclasses(Samizdat).difference(excludelist)
+    # Exclude double imports
+    heads = set()
+    unique = set()
+    for klass in all_subclasses(Samizdat).difference(excludelist):
+        if klass.head_id() not in heads:
+            unique.add(klass)
+            heads.add(klass.head_id())
+    return unique
 
 
 def samizdats_in_module(mod):
