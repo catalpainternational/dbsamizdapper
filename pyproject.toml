@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dbsamizdapper"
-version = "0.0.2"
+version = "0.0.3a0"
 description = ""
 authors = ["Josh Brooks <josh@catalpa.io>",]
 readme = "README.md"

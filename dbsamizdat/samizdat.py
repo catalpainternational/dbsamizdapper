@@ -47,7 +47,7 @@ class Samizdat(ProtoSamizdat):
         if cls.implanted_hash:
             return cls.implanted_hash
 
-        return md5("|".join([cls.sql_template, cls.db_object_identity()]).encode("utf-8")).hexdigest()
+        return md5("|".join([cls.get_sql_template(), cls.db_object_identity()]).encode("utf-8")).hexdigest()
 
     @classmethod
     def fqdeps_on(cls):
@@ -96,7 +96,7 @@ class Samizdat(ProtoSamizdat):
             postamble="WITH NO DATA" if cls.entity_type.name == "MATVIEW" else "",
             samizdatname=cls.db_object_identity(),
         )
-        return Template(cls.sql_template).safe_substitute(subst)
+        return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
     def drop(cls, if_exists=False):
@@ -153,7 +153,7 @@ class SamizdatFunction(Samizdat):
 
         # "Functions" adapt the hash to include creation options
         return md5(
-            "|".join([cls.sql_template, cls.db_object_identity(), cls.creation_identity()]).encode("utf-8")
+            "|".join([cls.get_sql_template(), cls.db_object_identity(), cls.creation_identity()]).encode("utf-8")
         ).hexdigest()
 
     @classmethod
@@ -166,7 +166,7 @@ class SamizdatFunction(Samizdat):
             preamble=f"CREATE {cls.entity_type.value} {cls.creation_identity()}",
             samizdatname=cls.db_object_identity(),
         )
-        return Template(cls.sql_template).safe_substitute(subst)
+        return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
     def head_id(cls):
@@ -210,7 +210,7 @@ class SamizdatTrigger(Samizdat):
             preamble=f"""CREATE {cls.entity_type.value} "{cls.get_name()}" {cls.condition} ON {target_table}""",
             samizdatname=cls.get_name(),
         )
-        return Template(cls.sql_template).safe_substitute(subst)
+        return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
     def drop(cls, if_exists=False):
