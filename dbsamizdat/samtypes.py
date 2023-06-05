@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Type
+from typing import Any, Callable, Iterable, Type
 
 from dbsamizdat.exceptions import UnsuitableNameError
 
@@ -187,11 +187,17 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
     deps_on: set[FQIffable] = set()
     deps_on_unmanaged: set[FQIffable] = set()
     schema: schemaname | None = "public"
-    sql_template: sql_query = """
+    sql_template: sql_query | Callable[
+        [], sql_query
+    ] = """
         -- There should be a class-dependent body for ${samizdatname} here.
         -- See README.md.
         """
     entity_type: entitypes
+
+    @classmethod
+    def get_sql_template(cls) -> sql_query:
+        return cls.sql_template if isinstance(cls.sql_template, str) else cls.sql_template()
 
     @classmethod
     def db_object_identity(cls) -> str:

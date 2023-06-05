@@ -124,7 +124,7 @@ def test_code_generation():
 
 def test_create_view():
     args = ArgType(txdiscipline="jumbo")
-
+    cmd_nuke(args)
     # What are the dependencies of `MaterializedThing`?
     with get_cursor(args) as cursor:
         cursor.execute(fruittable_SQL)
@@ -323,3 +323,26 @@ def test_sidekicks():
         c.execute("DROP TABLE IF EXISTS d2 CASCADE;")
 
     cmd_nuke(args)
+
+
+def test_executable_sql():
+    """
+    SQL can be provided by a function rather
+    than a static string
+    """
+
+    args = ArgType(txdiscipline="jumbo")
+
+    class Now(SamizdatMaterializedView):
+        @classmethod
+        def sql_template(cls):
+            my_query = "SELECT now()"
+            return f"""
+                ${{preamble}}
+                {my_query}
+                ${{postamble}};
+            """
+
+    cmd_sync(args, [Now])
+    with get_cursor(args) as c:
+        c.execute(f"SELECT * FROM {Now.db_object_identity()}")

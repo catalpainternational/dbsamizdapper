@@ -161,7 +161,7 @@ def cmd_refresh(args: ArgType):
         executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
-def cmd_sync(args: ArgType, samizdatsIn: list[Samizdat] | None = None):
+def cmd_sync(args: ArgType | None, samizdatsIn: list[Samizdat] | None = None):
     samizdats = tuple(get_sds(False, samizdatsIn)) or tuple(get_sds(args.in_django))
 
     with get_cursor(args) as cursor:
