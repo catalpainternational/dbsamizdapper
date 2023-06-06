@@ -1,61 +1,56 @@
 import inspect
-from abc import ABC
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Iterable
+from typing import Any, Type, TypeGuard
 
-from dbsamizdat.samizdat import (
-    Samizdat,
-    SamizdatFunction,
-    SamizdatMaterializedView,
-    SamizdatTrigger,
-    SamizdatView,
-    SamizdatWithSidekicks,
-)
-from dbsamizdat.samtypes import ProtoSamizdat
+from dbsamizdat.samizdat import Samizdat, SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
 
-excludelist = {
-    Samizdat,
-    SamizdatWithSidekicks,
-    SamizdatFunction,
-    SamizdatView,
-    SamizdatMaterializedView,
-    SamizdatTrigger,
-    ABC,
-}
+SamizType = Type[SamizdatFunction | SamizdatView | SamizdatMaterializedView | SamizdatTrigger]
+SamizTypes = set[SamizType]
 
 logger = getLogger(__name__)
 
 AUTOLOAD_MODULENAME = "dbsamizdat_defs"
 
 
-def get_samizdats() -> set[Samizdat]:
+def filter_sds(inputklass: Any) -> TypeGuard[SamizType]:
+    """
+    Returns subclasses of subclasses of "samizdat"
+    These are the classes which would be user-specified
+    """
+    subclasses_of = (
+        SamizdatFunction,
+        SamizdatView,
+        SamizdatMaterializedView,
+        SamizdatTrigger,
+    )
+    return inspect.isclass(inputklass) and issubclass(inputklass, subclasses_of) and inputklass not in subclasses_of
+
+
+def get_samizdats():
     """
     Returns all subclasses of "Samizdat"
     where they are not considered abstract
     """
 
-    def all_subclasses(cls):
-        return set(cls.__subclasses__()).union([s for c in cls.__subclasses__() for s in all_subclasses(c)])
+    def all_subclasses(cls=Samizdat):
+        subs = cls.__subclasses__()
+        yield from filter(filter_sds, subs)
+        for c in subs:
+            yield from all_subclasses(c)
 
-    # Exclude double imports
-    heads = set()
-    unique = set()
-    for klass in all_subclasses(Samizdat).difference(excludelist):
-        if klass.head_id() not in heads:
-            unique.add(klass)
-            heads.add(klass.head_id())
-    return unique
+    unique: dict[str, SamizType] = {}
+    for elem in all_subclasses():
+        unique.setdefault(elem.definition_hash(), elem)
+    yield from unique.values()
 
 
-def samizdats_in_module(mod):
+def samizdats_in_module(mod) -> SamizTypes:
     """
     Returns the samizdat instances in a given module
     """
-    for _, thing in inspect.getmembers(mod):
-        if inspect.isclass(thing) and ProtoSamizdat in thing.mro() and thing not in excludelist:
-            yield thing
+    return {thing for _, thing in inspect.getmembers(mod) if filter_sds(thing)}
 
 
 def samizdats_in_app(app_name: str):
@@ -67,7 +62,7 @@ def samizdats_in_app(app_name: str):
         yield from samizdats_in_module(module)
 
 
-def autodiscover_samizdats() -> Iterable[Samizdat]:
+def autodiscover_samizdats():
     """
     Search Django apps for "dbsamizdat_defs" files containing Samizdat models
     """

@@ -114,7 +114,7 @@ def premigrate_handler(sender, **kwargs):
         nuke(**kwargs)
         return
 
-    samizdats = list(depsort_with_sidekicks(sanity_check(get_samizdats())))
+    samizdats = list(depsort_with_sidekicks(sanity_check(set(get_samizdats()))))
     db_compare = dbstate_equals_definedstate(get_django_cursor(), samizdats)
     if not db_compare.issame:
         # There's unsynced samizdat state, and we can't tell if

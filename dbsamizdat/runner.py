@@ -7,7 +7,7 @@ from enum import Enum
 from importlib.util import find_spec
 from logging import getLogger
 from time import monotonic
-from typing import Generator, Iterable, Literal, Type
+from typing import Generator, Iterable, Literal
 
 import dotenv
 
@@ -17,8 +17,8 @@ from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
 from .libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
-from .loader import autodiscover_samizdats, get_samizdats
-from .samtypes import Cursor, FQTuple, ProtoSamizdat, entitypes
+from .loader import SamizType, autodiscover_samizdats, get_samizdats
+from .samtypes import Cursor, FQTuple, entitypes
 from .util import nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
@@ -67,7 +67,7 @@ def timer() -> Generator[float, None, None]:
         last = cur
 
 
-def get_sds(in_django: bool = False, samizdats: Iterable[Samizdat] | None = None):
+def get_sds(in_django: bool = False, samizdats: list[SamizType] | None = None):
     """
     Samizdats may be defined by:
      - A list
@@ -161,7 +161,7 @@ def cmd_refresh(args: ArgType):
         executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
-def cmd_sync(args: ArgType | None, samizdatsIn: list[Samizdat] | None = None):
+def cmd_sync(args: ArgType, samizdatsIn: list[SamizType] | None = None):
     samizdats = tuple(get_sds(False, samizdatsIn)) or tuple(get_sds(args.in_django))
 
     with get_cursor(args) as cursor:
@@ -221,7 +221,7 @@ def cmd_diff(args: ArgType):
 
         max_namelen = max(len(str(ds)) for ds in db_compare.excess_dbstate | db_compare.excess_definedstate)
 
-        def statefmt(state: Iterable[ProtoSamizdat], prefix):
+        def statefmt(state: Iterable[SamizType], prefix):
             return "\n".join(
                 f"%s%-17s\t%-{max_namelen}s\t%s" % (prefix, sd.entity_type.value, sd, sd.definition_hash())
                 for sd in sorted(state, key=lambda sd: str(sd))
@@ -275,7 +275,7 @@ def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
 
 
 def executor(
-    yielder: Iterable[tuple[ACTION, Samizdat | Type[ProtoSamizdat], str]],
+    yielder: Iterable[tuple[ACTION, SamizType, str]],
     args: ArgType,
     cursor: Cursor,
     max_namelen=0,
@@ -284,7 +284,7 @@ def executor(
     action_timer = timer()
     next(action_timer)
 
-    def progressprint(ix, action_totake, sd: Samizdat | Type[ProtoSamizdat], sql):
+    def progressprint(ix, action_totake, sd: SamizType, sql):
         if args.verbosity:
             if ix:
                 # print the processing time of the *previous* action

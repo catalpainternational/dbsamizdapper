@@ -1,12 +1,13 @@
 import warnings
 from enum import IntFlag
 from json import loads as jsonloads
-from typing import Iterable, NamedTuple, Type
+from typing import Iterable, NamedTuple
 
+from dbsamizdat.loader import SamizType, filter_sds
 from dbsamizdat.samizdat import Samizdat
 
 from . import SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
-from .samtypes import Cursor, ProtoSamizdat, entitypes
+from .samtypes import Cursor, entitypes
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
 
@@ -159,11 +160,11 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
 
 class DBComparison(NamedTuple):
     issame: bool
-    excess_dbstate: Iterable[Type[ProtoSamizdat]]
-    excess_definedstate: Iterable[Samizdat]
+    excess_dbstate: Iterable[SamizType]
+    excess_definedstate: Iterable[SamizType]
 
 
-def dbstate_equals_definedstate(cursor: Cursor, samizdats: Iterable[Samizdat]):
+def dbstate_equals_definedstate(cursor: Cursor, samizdats: Iterable[SamizType]):
     """
     Returns whether there are id's to add or remove and if so which
     samizdat classes (by id) need to be added or removed to sync database
@@ -172,7 +173,7 @@ def dbstate_equals_definedstate(cursor: Cursor, samizdats: Iterable[Samizdat]):
     current_state = get_dbstate(cursor)
     state_to_classes = (dbinfo_to_class(s) for s in current_state)
 
-    dbstate = {ds.head_id(): ds for ds in state_to_classes}
+    dbstate = {ds.head_id(): ds for ds in state_to_classes if filter_sds(ds)}
     definedstate = {ds.head_id(): ds for ds in samizdats}
 
     db_keys = dbstate.keys()
