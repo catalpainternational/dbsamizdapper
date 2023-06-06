@@ -24,4 +24,4 @@ jobs:
                   pip install black
             - name: run black
               run: |
-                  python -m black
+                  python -m black .
