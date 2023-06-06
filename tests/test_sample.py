@@ -15,7 +15,9 @@ from dbsamizdat.samtypes import FQTuple
 from sample_app.test_samizdats import DealFruitFun, DealFruitFunWithName
 
 load_dotenv()
-args = ArgType(txdiscipline="jumbo", verbosity=3, dburl=os.environ.get("DBURL", "postgresql:///postgres@localhost:5435/postgres"))
+args = ArgType(
+    txdiscipline="jumbo", verbosity=3, dburl=os.environ.get("DBURL", "postgresql:///postgres@localhost:5435/postgres")
+)
 
 
 fruittable_SQL = """
@@ -180,7 +182,6 @@ def test_long_name_raises():
 
 
 def test_unsuitable_name_raises():
-
     class BadlyNamedSamizdat(SamizdatView):
         object_name = '"hello"'
         sql_template = """
@@ -195,7 +196,6 @@ def test_unsuitable_name_raises():
 
 
 def test_duplicate_name_raises():
-
     class IAmCalledHello(SamizdatView):
         object_name = "hello"
         sql_template = """
@@ -218,7 +218,6 @@ def test_duplicate_name_raises():
 
 
 def test_cyclic_exception():
-
     class helloWorld(SamizdatView):
         deps_on = {"hello2"}
         object_name = "hello"
@@ -322,7 +321,6 @@ def test_executable_sql():
     than a static string
     """
 
-
     class Now(SamizdatMaterializedView):
         @classmethod
         def sql_template(cls):
@@ -344,7 +342,6 @@ def test_multiple_inheritance():
     """
     A more complex inheritance example
     """
-
 
     class NowOne(SamizdatMaterializedView):
         sql_template = """

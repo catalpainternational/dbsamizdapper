@@ -32,16 +32,20 @@ jobs:
 
     - name: Install OS level dependencies
       run: |
-          sudo apt-get update
-          sudo apt-get install binutils libproj-dev gdal-bin python3-psycopg2
+        sudo apt-get update
+        sudo apt-get install binutils libproj-dev gdal-bin python3-psycopg2
 
     - name: Test with pytest
       if: always()
-      run: poetry run pytest
+      run: |
+        pip install psycopg
+        poetry run pytest
 
     - name: Test mypy
       if: always()
-      run: poetry run mypy .
+      run: |
+        pip install django-stubs
+        poetry run mypy .
 
     - name: Test with black
       if: always()

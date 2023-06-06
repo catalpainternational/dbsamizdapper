@@ -100,9 +100,6 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
 
         cursor = connections[args.dbconn].cursor().cursor
 
-    elif not args.dburl:
-        raise NotImplementedError("No dburl provided: nothing to do!")
-
     elif dburl and find_spec("psycopg"):
         import psycopg  # noqa: F811
 
@@ -114,6 +111,9 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
 
         conn = psycopg2.connect(dburl)
         cursor = conn.cursor()
+
+    else:
+        raise NotImplementedError("Required: a Django project or psycopg[2] and a DB url")
 
     cursor.execute("BEGIN;")
     yield cursor
