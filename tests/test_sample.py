@@ -15,8 +15,7 @@ from dbsamizdat.samtypes import FQTuple
 from sample_app.test_samizdats import DealFruitFun, DealFruitFunWithName
 
 load_dotenv()
-
-DEFAULT_URL = os.environ.get("DBURL")
+args = ArgType(txdiscipline="jumbo", verbosity=3, dburl=os.environ.get("DBURL", "postgresql:///postgres@localhost:5435/postgres"))
 
 
 fruittable_SQL = """
@@ -80,7 +79,6 @@ def test_code_generation():
     """
     Assert that code generation raises no errors
     """
-    args = ArgType(txdiscipline="jumbo", verbosity=3)
     AnotherThing.create()
     AnotherThing.drop()
     MaterializedThing.create()
@@ -123,7 +121,6 @@ def test_code_generation():
 
 
 def test_create_view():
-    args = ArgType(txdiscipline="jumbo")
     cmd_nuke(args)
     # What are the dependencies of `MaterializedThing`?
     with get_cursor(args) as cursor:
@@ -168,7 +165,6 @@ def test_long_name_raises():
     """
     Samizdats with 'broken' names are not allowed
     """
-    args = ArgType(txdiscipline="jumbo")
 
     class LongNamedSamizdat(SamizdatView):
         object_name = "hello" * 60
@@ -184,7 +180,6 @@ def test_long_name_raises():
 
 
 def test_unsuitable_name_raises():
-    args = ArgType(txdiscipline="jumbo")
 
     class BadlyNamedSamizdat(SamizdatView):
         object_name = '"hello"'
@@ -200,7 +195,6 @@ def test_unsuitable_name_raises():
 
 
 def test_duplicate_name_raises():
-    args = ArgType(txdiscipline="jumbo")
 
     class IAmCalledHello(SamizdatView):
         object_name = "hello"
@@ -224,7 +218,6 @@ def test_duplicate_name_raises():
 
 
 def test_cyclic_exception():
-    args = ArgType(txdiscipline="jumbo")
 
     class helloWorld(SamizdatView):
         deps_on = {"hello2"}
@@ -253,7 +246,6 @@ def test_self_reference_raises():
     """
     A Samizdat may not refer to itself as a dependency
     """
-    args = ArgType(txdiscipline="jumbo")
 
     class hello(SamizdatView):
         deps_on = {"hello"}
@@ -275,7 +267,6 @@ def test_sidekicks():
     with "refresh triggers" watches for changes
     """
 
-    args = ArgType(txdiscipline="jumbo")
     cmd_nuke(args)
 
     class Treater(SamizdatMaterializedView):
@@ -331,7 +322,6 @@ def test_executable_sql():
     than a static string
     """
 
-    args = ArgType(txdiscipline="jumbo")
 
     class Now(SamizdatMaterializedView):
         @classmethod
@@ -355,7 +345,6 @@ def test_multiple_inheritance():
     A more complex inheritance example
     """
 
-    args = ArgType(txdiscipline="jumbo")
 
     class NowOne(SamizdatMaterializedView):
         sql_template = """
