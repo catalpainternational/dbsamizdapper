@@ -16,7 +16,7 @@ from sample_app.test_samizdats import DealFruitFun, DealFruitFunWithName
 
 load_dotenv()
 args = ArgType(
-    txdiscipline="jumbo", verbosity=3, dburl=os.environ.get("DBURL", "postgresql:///postgres@localhost:5435/postgres")
+    txdiscipline="jumbo", verbosity=3, dburl=os.environ.get("DBURL", "postgresql://postgres@localhost:5435/postgres")
 )
 
 
