@@ -1,25 +1,25 @@
-import typing
 from collections import Counter
 from functools import reduce
 from itertools import chain
 from operator import or_
+from typing import Iterable
 
 from toposort import CircularDependencyError, toposort
 
+from dbsamizdat.loader import SamizType, filter_sds
 from dbsamizdat.samizdat import Samizdat, SamizdatWithSidekicks
 
 from .exceptions import DanglingReferenceError, DependencyCycleError, NameClashError, TypeConfusionError
-from .samtypes import ProtoSamizdat
 
 
-def gen_edges(samizdats: typing.Iterable[Samizdat]):
+def gen_edges(samizdats: Iterable[Samizdat]):
     for sd in samizdats:
         for n2 in sd.fqdeps_on():
             yield (n2, sd.fq())
 
 
 def gen_autorefresh_edges(
-    samizdats: typing.Iterable[Samizdat],
+    samizdats: Iterable[Samizdat],
 ):
     """
     R
@@ -29,20 +29,20 @@ def gen_autorefresh_edges(
             yield (sd, sd.fq())
 
 
-def gen_unmanaged_edges(samizdats: typing.Iterable[Samizdat]):
+def gen_unmanaged_edges(samizdats: Iterable[Samizdat]):
     for sd in samizdats:
         for n2 in sd.fqdeps_on_unmanaged():
             yield (n2, sd.fq())
 
 
-def node_dump(samizdats: typing.Iterable[Samizdat]):
+def node_dump(samizdats: Iterable[Samizdat]):
     """
     All nodes (managed or unmanaged)
     """
     return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq()} for sd in samizdats))
 
 
-def unmanaged_refs(samizdats: typing.Iterable[Samizdat | SamizdatWithSidekicks]):
+def unmanaged_refs(samizdats: Iterable[Samizdat | SamizdatWithSidekicks]):
     """
     All unmanaged nodes referenced
     """
@@ -88,7 +88,7 @@ def subtree_depends(samizdats: list[Samizdat], roots):
     )
 
 
-def depsort(samizdats: typing.Iterable[Samizdat]):
+def depsort(samizdats: Iterable[SamizType]):
     """
     Topologically sort samizdats
     """
@@ -99,12 +99,12 @@ def depsort(samizdats: typing.Iterable[Samizdat]):
     return [samizdat_map[name] for name in chain(*toposorted)]
 
 
-def depsort_with_sidekicks(samizdats: typing.Iterable[Samizdat]):
+def depsort_with_sidekicks(samizdats: Iterable[SamizType]):
     """
     Injects "sidekicks" ino the topologically sorted
     samizdats list
     """
-    returns: list[ProtoSamizdat] = []
+    returns: list[SamizType] = []
     heads = {sd.head_id() for sd in samizdats}
 
     for samizdat in depsort(samizdats):
@@ -112,16 +112,13 @@ def depsort_with_sidekicks(samizdats: typing.Iterable[Samizdat]):
         if hasattr(samizdat, "sidekicks"):
             sd: SamizdatWithSidekicks = samizdat  # Declare the type for mypy
             for kick in sd.sidekicks():
-                if kick.head_id() not in heads:
+                if filter_sds(kick) and kick.head_id() not in heads:
                     returns.append(kick)
                     heads.add(kick.head_id())
     return returns
 
 
-T = typing.TypeVar("T", bound=Samizdat)
-
-
-def sanity_check(samizdats: typing.Iterable[T]) -> typing.Iterable[T]:
+def sanity_check(samizdats: Iterable[SamizType]) -> Iterable[SamizType]:
     """
     Checks for a number of invalid conditions on the Samizdat tree
     """

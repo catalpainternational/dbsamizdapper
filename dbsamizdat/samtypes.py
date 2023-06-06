@@ -187,12 +187,7 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
     deps_on: set[FQIffable] = set()
     deps_on_unmanaged: set[FQIffable] = set()
     schema: schemaname | None = "public"
-    sql_template: sql_query | Callable[
-        [], sql_query
-    ] = """
-        -- There should be a class-dependent body for ${samizdatname} here.
-        -- See README.md.
-        """
+    sql_template: sql_query | Callable[[], sql_query]
     entity_type: entitypes
 
     @classmethod

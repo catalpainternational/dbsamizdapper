@@ -137,7 +137,7 @@ def test_create_view():
 
     # All dbszmizdats should be registered now
 
-    samizdats = tuple(depsort_with_sidekicks(sanity_check(get_samizdats())))
+    samizdats = tuple(depsort_with_sidekicks(sanity_check(set(get_samizdats()))))
 
     dot(samizdats)
 
@@ -346,3 +346,66 @@ def test_executable_sql():
     cmd_sync(args, [Now])
     with get_cursor(args) as c:
         c.execute(f"SELECT * FROM {Now.db_object_identity()}")
+    cmd_nuke(args)
+    del Now
+
+
+def test_multiple_inheritance():
+    """
+    A more complex inheritance example
+    """
+
+    args = ArgType(txdiscipline="jumbo")
+
+    class NowOne(SamizdatMaterializedView):
+        sql_template = """
+            ${preamble}
+            SELECT Now()
+            ${postamble};
+        """
+
+    class NowTwo(SamizdatMaterializedView):
+        deps_on = {NowOne}
+        sql_template = """
+            ${preamble}
+            SELECT * FROM "NowOne"
+            ${postamble};
+        """
+
+    class NowThree(SamizdatMaterializedView):
+        deps_on = {NowTwo}
+        sql_template = """
+            ${preamble}
+            SELECT * FROM "NowTwo"
+            ${postamble};
+        """
+
+    class N4(SamizdatMaterializedView):
+        deps_on = {NowThree}
+        sql_template = """
+            ${preamble}
+            SELECT * FROM "NowThree"
+            ${postamble};
+        """
+
+    class N5(SamizdatMaterializedView):
+        deps_on = {N4}
+        sql_template = """
+            ${preamble}
+            SELECT * FROM "N4"
+            ${postamble};
+        """
+
+    class N6(SamizdatMaterializedView):
+        deps_on = {N4}
+        sql_template = """
+            ${preamble}
+            SELECT * FROM "N4"
+            ${postamble};
+        """
+
+    cmd_sync(args, [NowOne, NowTwo, NowThree, N4, N5, N6])
+    with get_cursor(args) as c:
+        c.execute(f"SELECT * FROM {N6.db_object_identity()}")
+    cmd_nuke(args)
+    del N6
