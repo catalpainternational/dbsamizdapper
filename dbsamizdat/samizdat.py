@@ -6,6 +6,7 @@ from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
+from typing import Any, TypeGuard
 
 from dbsamizdat.samtypes import (
     FQTuple,
@@ -107,7 +108,7 @@ class Samizdat(ProtoSamizdat):
         """
         subst = dict(
             preamble=f"""CREATE {cls.entity_type.value} {cls.db_object_identity()} AS""",
-            postamble="WITH NO DATA" if cls.entity_type.name == "MATVIEW" else "",
+            postamble="WITH NO DATA" if sd_is_matview(cls) else "",
             samizdatname=cls.db_object_identity(),
         )
         return Template(cls.get_sql_template()).safe_substitute(subst)
@@ -441,3 +442,22 @@ class SamizdatModel(SamizdatQuerySet):
 
 class SamizdatMaterializedModel(SamizdatModel, SamizdatMaterializedView):
     entity_type = entitypes.MATVIEW
+
+
+def sd_is_view(sd: Any) -> TypeGuard[SamizdatView]:
+    return getattr(sd, "entity_type", None) == entitypes.VIEW
+
+
+def sd_is_matview(sd: Any) -> TypeGuard[SamizdatMaterializedView]:
+    """
+    This is used to determine refresh methods when sync'ing
+    """
+    return getattr(sd, "entity_type", None) == entitypes.MATVIEW
+
+
+def sd_is_function(sd: Any) -> TypeGuard[SamizdatFunction]:
+    return getattr(sd, "entity_type", None) == entitypes.FUNCTION
+
+
+def sd_is_trigger(sd: Any) -> TypeGuard[SamizdatTrigger]:
+    return getattr(sd, "entity_type", None) == entitypes.TRIGGER

@@ -11,14 +11,13 @@ from typing import Generator, Iterable, Literal
 
 import dotenv
 
-from dbsamizdat.samizdat import Samizdat, SamizdatMaterializedView
-
 from .exceptions import DatabaseError, FunctionSignatureError, SamizdatException
 from .graphvizdot import dot
 from .libdb import dbinfo_to_class, dbstate_equals_definedstate, get_dbstate
 from .libgraph import depsort_with_sidekicks, node_dump, sanity_check, subtree_depends
 from .loader import SamizType, autodiscover_samizdats, get_samizdats
-from .samtypes import Cursor, FQTuple, entitypes
+from .samizdat import sd_is_matview
+from .samtypes import Cursor, FQTuple
 from .util import nodenamefmt, sqlfmt
 
 if typing.TYPE_CHECKING:
@@ -139,7 +138,7 @@ def txi_finalize(cursor: Cursor, txdiscipline: Literal["jumbo", "dryrun", "check
 def cmd_refresh(args: ArgType):
     with get_cursor(args) as cursor:
         samizdats = get_sds(args.in_django)
-        matviews: list[SamizdatMaterializedView] = [sd for sd in samizdats if sd.entity_type == entitypes.MATVIEW]
+        matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
             rootnodes = {FQTuple.fqify(rootnode) for rootnode in args.belownodes}
@@ -162,6 +161,10 @@ def cmd_refresh(args: ArgType):
 
 
 def cmd_sync(args: ArgType, samizdatsIn: list[SamizType] | None = None):
+    """
+    This calls the `executor` function with commands to drop / create / refresh
+    instances of Samizdats which are out of sync
+    """
     samizdats = tuple(get_sds(False, samizdatsIn)) or tuple(get_sds(args.in_django))
 
     with get_cursor(args) as cursor:
@@ -173,42 +176,37 @@ def cmd_sync(args: ArgType, samizdatsIn: list[SamizType] | None = None):
         # Get the longest name from what's in the
         # database and defined state
         max_namelen = max(len(str(ds)) for ds in db_compare.excess_dbstate | db_compare.excess_definedstate)
-        if db_compare.excess_dbstate:
 
-            def drops():
-                for sd in db_compare.excess_dbstate:
-                    yield "drop", sd, sd.drop(if_exists=True)
-                    # we don't know the deptree; so they may have vanished
-                    # through a cascading drop of a previous object
+        def drops():
+            for sd in db_compare.excess_dbstate:
+                yield "drop", sd, sd.drop(if_exists=True)
+                # we don't know the deptree; so they may have vanished
+                # through a cascading drop of a previous object
 
-            executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
-            db_compare = dbstate_equals_definedstate(cursor, samizdats)
-            # again, we don't know the in-db deptree, so we need to re-read DB
-            # state as the rug may have been pulled out from under us with cascading
-            # drops
-        if db_compare.excess_definedstate:
+        executor(drops(), args, cursor, max_namelen=max_namelen, timing=True)
+        db_compare = dbstate_equals_definedstate(cursor, samizdats)
+        # again, we don't know the in-db deptree, so we need to re-read DB
+        # state as the rug may have been pulled out from under us with cascading
+        # drops
 
-            def creates():
-                to_create_ids = {sd.head_id() for sd in db_compare.excess_definedstate}
-                for sd in samizdats:  # iterate in proper creation order
-                    if sd.head_id() not in to_create_ids:
-                        continue
-                    yield "create", sd, sd.create()
-                    yield "sign", sd, sd.sign(cursor)
+        def creates():
+            to_create_ids = {sd.head_id() for sd in db_compare.excess_definedstate}
 
-            executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
+            for sd in samizdats:  # iterate in proper creation order
+                if sd.head_id() not in to_create_ids:
+                    continue
+                yield "create", sd, sd.create()
+                yield "sign", sd, sd.sign(cursor)
 
-            matviews_to_refresh = {
-                sd.head_id() for sd in db_compare.excess_definedstate if sd.entity_type == entitypes.MATVIEW
-            }
-            if matviews_to_refresh:
+        executor(creates(), args, cursor, max_namelen=max_namelen, timing=True)
 
-                def refreshes():
-                    for sd in samizdats:  # iterate in proper creation order
-                        if sd.head_id() in matviews_to_refresh:
-                            yield "refresh", sd, sd.refresh(concurrent_allowed=False)
+        def refreshes():
+            for sd in filter(sd_is_matview, samizdats):
+                if sd not in db_compare.excess_definedstate:
+                    continue
+                yield "refresh", sd, sd.refresh(concurrent_allowed=False)
 
-                executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
+        executor(refreshes(), args, cursor, max_namelen=max_namelen, timing=True)
 
 
 def cmd_diff(args: ArgType):
@@ -255,7 +253,7 @@ def cmd_printdot(args: ArgType):
     print("\n".join(dot(get_sds(args.in_django))))
 
 
-def cmd_nuke(args: ArgType, samizdats: list[Samizdat] | None = None):
+def cmd_nuke(args: ArgType, samizdats: list[SamizType] | None = None):
     with get_cursor(args) as cursor:
 
         def nukes():
