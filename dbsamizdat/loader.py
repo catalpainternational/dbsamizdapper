@@ -7,15 +7,27 @@ from typing import Any, Type, TypeGuard
 from dbsamizdat.samizdat import (
     Samizdat,
     SamizdatFunction,
+    SamizdatMaterializedModel,
     SamizdatMaterializedQuerySet,
     SamizdatMaterializedView,
+    SamizdatModel,
+    SamizdatQuerySet,
     SamizdatTrigger,
     SamizdatView,
 )
 
 SamizType = Type[
-    SamizdatFunction | SamizdatView | SamizdatMaterializedView | SamizdatTrigger | SamizdatMaterializedQuerySet
+    Samizdat
+    | SamizdatFunction
+    | SamizdatMaterializedModel
+    | SamizdatMaterializedQuerySet
+    | SamizdatMaterializedView
+    | SamizdatModel
+    | SamizdatQuerySet
+    | SamizdatTrigger
+    | SamizdatView
 ]
+
 SamizTypes = set[SamizType]
 
 logger = getLogger(__name__)
@@ -30,10 +42,13 @@ def filter_sds(inputklass: Any) -> TypeGuard[SamizType]:
     """
     subclasses_of = (
         SamizdatFunction,
-        SamizdatView,
-        SamizdatMaterializedView,
-        SamizdatTrigger,
+        SamizdatMaterializedModel,
         SamizdatMaterializedQuerySet,
+        SamizdatMaterializedView,
+        SamizdatModel,
+        SamizdatQuerySet,
+        SamizdatTrigger,
+        SamizdatView,
     )
     return inspect.isclass(inputklass) and issubclass(inputklass, subclasses_of) and inputklass not in subclasses_of
 
