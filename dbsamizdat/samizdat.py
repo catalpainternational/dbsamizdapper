@@ -11,6 +11,13 @@ from dbsamizdat.samtypes import FQTuple, HasRefreshTriggers, HasSidekicks, Mogri
 
 from .util import nodenamefmt
 
+if typing.TYPE_CHECKING:
+    try:
+        from django.db import connection  # noqa: F401
+        from django.db.models import QuerySet
+    except ModuleNotFoundError:
+        pass
+
 _DBINFO_VERSION = 1  # Version number for signature format. For future use
 
 TRIGGER_DEPCOUNTER_PADDED_WIDTH = 5
@@ -332,7 +339,38 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
         if not cls.refresh_triggers:
             return
 
-        counter = Counter()
+        counter: typing.Counter[str] = Counter()
         counter.update({cls.AUTOREFRESHER_COUNTER: 1})
         yield from cls.gen_refresh_triggerfunction()
         yield from cls.gen_refresh_tabletriggers(counter=counter)
+
+
+class SamizdatMaterializedQuerySet(SamizdatMaterializedView):
+    """
+    Class to convert a Django queryset into a materialized view
+    Primarily this is to simplify deeply nested Django operations
+    """
+
+    queryset: QuerySet
+
+    @classmethod
+    def _get_query(cls):
+        """
+        Returns the query, as a string
+        """
+        try:
+            from django.db import connection  # noqa: F811
+        except ModuleNotFoundError as E:
+            raise ModuleNotFoundError("Django is required for a materialized queryset") from E
+
+        with connection.cursor() as c:
+            query = c.mogrify(*cls.queryset.query.sql_with_params())
+            if isinstance(query, bytes):
+                # Some psycopg2 flavours will give str, others bytes
+                # force consistency
+                query = query.decode()
+        return query
+
+    @classmethod
+    def sql_template(cls):
+        return f"""${{preamble}} {cls._get_query()} ${{postamble}}"""

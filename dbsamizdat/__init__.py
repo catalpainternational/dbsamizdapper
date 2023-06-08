@@ -1,4 +1,5 @@
 from .samizdat import SamizdatFunction  # noqa: F401
+from .samizdat import SamizdatMaterializedQuerySet  # noqa: F401
 from .samizdat import SamizdatMaterializedView  # noqa: F401
 from .samizdat import SamizdatTrigger  # noqa: F401
 from .samizdat import SamizdatView  # noqa: F401
