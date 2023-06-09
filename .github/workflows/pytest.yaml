@@ -41,7 +41,7 @@ jobs:
 
     - name: Test mypy
       if: always()
-      run: poetry run pip install django-stubs && poetry run mypy .
+      run: poetry run pip install django-stubs && poetry run mypy --check-untyped-defs .
 
     - name: Test with black
       if: always()
