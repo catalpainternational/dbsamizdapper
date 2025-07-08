@@ -26,11 +26,11 @@ and probably many more undocumented changes
 
 Spin up a docker container
 
-`docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
+`docker run -p 5435:5432 --rm -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
 
 or
 
-`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/postgres:15`
+`podman run -p 5435:5432 --rm -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/postgres:15`
 
 The db url for this container would be:
 
