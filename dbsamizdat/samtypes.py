@@ -75,7 +75,7 @@ class FQTuple:
             Convert a 2tuple of schema, thing_name
             """
             if len(arg) == 1:
-                return cls(schema=arg[1])
+                return cls(object_name=arg[0])
 
             if len(arg) == 2:
                 return cls(schema=arg[0], object_name=arg[1])
@@ -191,7 +191,10 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     def get_sql_template(cls) -> sql_query:
-        return cls.sql_template if isinstance(cls.sql_template, str) else cls.sql_template()
+        template: sql_query | Callable[[], sql_query] = getattr(cls, "sql_template")
+        if isinstance(template, str):
+            return template
+        return template()
 
     @classmethod
     def db_object_identity(cls) -> str:
@@ -266,3 +269,6 @@ class Cursor(Mogrifier):
 
     @abstractmethod
     def fetchall(self) -> list: ...
+
+    @abstractmethod
+    def fetchone(self) -> tuple: ...

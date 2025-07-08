@@ -30,7 +30,7 @@ Spin up a docker container
 
 or
 
-`podman run -p 5432:5435 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/postgres:15`
+`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/postgres:15`
 
 The db url for this container would be:
 
