@@ -5,3 +5,7 @@ VERSION
 .mypy_cache
 .coverage
 .env
+.venv/
+build/
+*.egg-info/
+.pytest_cache/
