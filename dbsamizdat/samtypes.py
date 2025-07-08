@@ -37,8 +37,7 @@ class HasFQ(ABC):
 
     @classmethod
     @abstractmethod
-    def fq(cls) -> FQTuple:
-        ...
+    def fq(cls) -> FQTuple: ...
 
 
 @dataclass(frozen=True)
@@ -209,13 +208,11 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     @abstractmethod
-    def fqdeps_on(cls) -> set[FQTuple]:
-        ...
+    def fqdeps_on(cls) -> set[FQTuple]: ...
 
     @classmethod
     @abstractmethod
-    def fqdeps_on_unmanaged(cls) -> set[FQTuple]:
-        ...
+    def fqdeps_on_unmanaged(cls) -> set[FQTuple]: ...
 
     @classmethod
     @abstractmethod
@@ -227,8 +224,7 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     @abstractmethod
-    def head_id(cls) -> str:
-        ...
+    def head_id(cls) -> str: ...
 
 
 FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | Type[ProtoSamizdat] | tuple[str, ...]
@@ -243,8 +239,7 @@ class HasSidekicks(ABC):
 
     @classmethod
     @abstractmethod
-    def sidekicks(cls) -> Iterable["ProtoSamizdat"]:
-        ...
+    def sidekicks(cls) -> Iterable["ProtoSamizdat"]: ...
 
 
 class Mogrifier(ABC):
@@ -254,12 +249,10 @@ class Mogrifier(ABC):
     """
 
     @abstractmethod
-    def mogrify(self, *args, **kwargs) -> str | bytes:
-        ...
+    def mogrify(self, *args, **kwargs) -> str | bytes: ...
 
     @property
-    def connection(self) -> Any:
-        ...
+    def connection(self) -> Any: ...
 
 
 class Cursor(Mogrifier):
@@ -267,12 +260,9 @@ class Cursor(Mogrifier):
     Approximately define what you need in a 'cursor' class
     """
 
-    def execute(self, str) -> None:
-        ...
+    def execute(self, str) -> None: ...
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
     @abstractmethod
-    def fetchall(self) -> list:
-        ...
+    def fetchall(self) -> list: ...
