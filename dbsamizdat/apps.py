@@ -56,13 +56,13 @@ def get_django_cursor():
     )
 
 
-def tables_affected_by(apps, plan):
+def tables_affected_by(apps, plan) -> tuple[bool, set[FQTuple]]:
     """
     Returns tables potentially affected by a migration plan.
     There are false positives, because we don't know what a view depending on a table exactly reads from that table.
     Worse, there may be false negatives, as we may not understand all types of migrations, and the migration plan is not a public API.
     """
-    tables_affected = set()
+    tables_affected: set[FQTuple] = set()
     for mig, reverse in plan:
         if reverse:
             return (
