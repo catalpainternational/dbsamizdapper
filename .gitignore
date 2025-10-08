@@ -6,3 +6,5 @@ VERSION
 .coverage
 .env
 agents/*.md
+.venv/
+uv.lock
