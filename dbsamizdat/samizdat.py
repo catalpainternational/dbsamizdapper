@@ -133,7 +133,7 @@ class SamizdatView(Samizdat):
 
 class SamizdatTable(Samizdat):
     entity_type = entitypes.TABLE
-    unlogged = True  # By default, the table is "unlogged"
+    unlogged = False  # By default, tables are logged (durable)
 
 
 class SamizdatFunction(Samizdat):
