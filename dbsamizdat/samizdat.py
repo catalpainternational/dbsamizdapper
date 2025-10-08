@@ -107,8 +107,9 @@ class Samizdat(ProtoSamizdat):
         SQL to create this DB object
         """
         _AS = "" if cls.entity_type.name == "TABLE" else " AS "
+        opts = ["UNLOGGED "] if getattr(cls, "unlogged", False) else []
         subst = dict(
-            preamble=f"""CREATE {cls.entity_type.value} {cls.db_object_identity()}{_AS}""",
+            preamble=f"""CREATE {" ".join(opts)}{cls.entity_type.value} {cls.db_object_identity()}{_AS}""",
             postamble="WITH NO DATA" if sd_is_matview(cls) else "",
             samizdatname=cls.db_object_identity(),
         )
@@ -132,6 +133,7 @@ class SamizdatView(Samizdat):
 
 class SamizdatTable(Samizdat):
     entity_type = entitypes.TABLE
+    unlogged = True  # By default, the table is "unlogged"
 
 
 class SamizdatFunction(Samizdat):

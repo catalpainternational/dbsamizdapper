@@ -267,6 +267,17 @@ def test_samizdat_table_state_tracking():
     cmd_nuke(args)
 
 
+def test_samizdat_table_unlogged():
+    """Test that unlogged tables are created"""
+
+    class UnloggedTable(SimpleTable):
+        unlogged = True
+
+    cmd_nuke(args)
+    cmd_sync(args, [UnloggedTable])
+    cmd_nuke(args)
+
+
 def test_samizdat_table_name_clashes():
     """Test that name clashes are detected"""
     class DuplicateTable1(SamizdatTable):
