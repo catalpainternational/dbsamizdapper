@@ -50,7 +50,10 @@ This fork is based on a rewrite which I did to better understand the internals o
  - Type hints throughout the codebase
  - Changed from `ABC` to `Protocol` type for inheritance
  - UV for fast dependency management
- - **Django QuerySet integration** (new in 0.0.5)
+ - **Table Management** (new in 0.0.6)
+   - `SamizdatTable` - Manage database tables as Samizdat objects
+   - UNLOGGED table support for performance-critical use cases
+ - **Django QuerySet integration** (0.0.5)
    - `SamizdatQuerySet` - Create views from Django QuerySets
    - `SamizdatMaterializedQuerySet` - Materialized views from QuerySets
    - `SamizdatModel` - Unmanaged Django models as views
@@ -62,6 +65,33 @@ This fork is based on a rewrite which I did to better understand the internals o
  - some simple `pytest` functions
 
 and probably many more undocumented changes
+
+### Table Management Example
+
+```python
+from dbsamizdat import SamizdatTable
+
+class MyTable(SamizdatTable):
+    """Manage a table as a Samizdat object"""
+    sql_template = """
+    CREATE TABLE ${samizdatname} (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """
+
+class MyCacheTable(SamizdatTable):
+    """UNLOGGED table for better performance"""
+    unlogged = True
+    sql_template = """
+    CREATE TABLE ${samizdatname} (
+        key TEXT PRIMARY KEY,
+        value JSONB,
+        expires_at TIMESTAMP
+    )
+    """
+```
 
 ### Django QuerySet Example
 
