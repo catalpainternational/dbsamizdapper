@@ -5,3 +5,4 @@ VERSION
 .mypy_cache
 .coverage
 .env
+.agents/
