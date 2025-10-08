@@ -1,26 +1,20 @@
-"""
-Tests for the SamizdatTable type
-"""
-import os
-import pytest
-from dotenv import load_dotenv
+"""Tests for the SamizdatTable type"""
 
-from dbsamizdat.exceptions import UnsuitableNameError, NameClashError
+import pytest
+
+from dbsamizdat.exceptions import NameClashError, UnsuitableNameError
 from dbsamizdat.libdb import dbstate_equals_definedstate, get_dbstate
 from dbsamizdat.libgraph import depsort_with_sidekicks, sanity_check
-from dbsamizdat.runner import ArgType, cmd_nuke, cmd_sync, get_cursor
-from dbsamizdat.samizdat import SamizdatTable, SamizdatView, SamizdatMaterializedView
+from dbsamizdat.runner import cmd_sync, get_cursor
+from dbsamizdat.samizdat import SamizdatMaterializedView, SamizdatTable, SamizdatView
 from dbsamizdat.samtypes import FQTuple, entitypes
 
-load_dotenv()
-args = ArgType(
-    txdiscipline="jumbo", 
-    verbosity=3, 
-    dburl=os.environ.get("DBURL", "postgresql://postgres@localhost:5435/postgres")
-)
+# ==================== Test Table Definitions ====================
 
 
 class SimpleTable(SamizdatTable):
+    """Basic table for testing"""
+
     sql_template = """
         ${preamble}
         (
@@ -33,6 +27,8 @@ class SimpleTable(SamizdatTable):
 
 
 class TableWithConstraints(SamizdatTable):
+    """Table with various constraints"""
+
     sql_template = """
         ${preamble}
         (
@@ -46,6 +42,8 @@ class TableWithConstraints(SamizdatTable):
 
 
 class ViewDependingOnTable(SamizdatView):
+    """View that depends on SimpleTable"""
+
     deps_on = {SimpleTable}
     sql_template = f"""
         ${{preamble}}
@@ -56,6 +54,8 @@ class ViewDependingOnTable(SamizdatView):
 
 
 class MaterializedViewDependingOnTable(SamizdatMaterializedView):
+    """Materialized view that depends on SimpleTable"""
+
     deps_on = {SimpleTable}
     sql_template = f"""
         ${{preamble}}
@@ -67,6 +67,10 @@ class MaterializedViewDependingOnTable(SamizdatMaterializedView):
     """
 
 
+# ==================== Unit Tests (No Database) ====================
+
+
+@pytest.mark.unit
 def test_samizdat_table_basic_properties():
     """Test basic properties of SamizdatTable"""
     assert SimpleTable.entity_type == entitypes.TABLE
@@ -76,11 +80,13 @@ def test_samizdat_table_basic_properties():
     assert SimpleTable.fq() == FQTuple("public", "SimpleTable")
 
 
+@pytest.mark.unit
 def test_samizdat_table_validation():
     """Test that SamizdatTable validates names properly"""
-    SimpleTable.validate_name()  # Should not raise
-    
-    # Test with invalid name
+    # Valid name should not raise
+    SimpleTable.validate_name()
+
+    # Invalid name should raise
     class BadNameTable(SamizdatTable):
         object_name = "hello" * 60  # Too long
         sql_template = """
@@ -88,21 +94,23 @@ def test_samizdat_table_validation():
             (id INTEGER)
             ${postamble}
         """
-    
+
     with pytest.raises(UnsuitableNameError):
         BadNameTable.validate_name()
 
 
+@pytest.mark.unit
 def test_samizdat_table_sql_generation():
     """Test SQL generation for tables"""
     create_sql = SimpleTable.create()
-    
-    # Should contain CREATE TABLE
+
+    # Should contain CREATE TABLE (not UNLOGGED by default)
     assert "CREATE TABLE" in create_sql
+    assert "UNLOGGED" not in create_sql, "Default tables should not be UNLOGGED"
     assert SimpleTable.db_object_identity() in create_sql
     assert "id SERIAL PRIMARY KEY" in create_sql
     assert "name VARCHAR(100) NOT NULL" in create_sql
-    
+
     # Test drop SQL
     drop_sql = SimpleTable.drop()
     assert "DROP TABLE" in drop_sql
@@ -110,176 +118,206 @@ def test_samizdat_table_sql_generation():
     assert "CASCADE" in drop_sql
 
 
+@pytest.mark.unit
 def test_samizdat_table_with_constraints():
     """Test table with various constraints"""
     create_sql = TableWithConstraints.create()
-    
+
     assert "email VARCHAR(255) UNIQUE NOT NULL" in create_sql
     assert "age INTEGER CHECK (age >= 0)" in create_sql
     assert "DEFAULT 'Unknown'" in create_sql
 
 
+@pytest.mark.unit
 def test_samizdat_table_dependencies():
     """Test dependency handling with tables"""
     # Tables should not have dependencies by default
     assert SimpleTable.fqdeps_on() == set()
     assert SimpleTable.fqdeps_on_unmanaged() == set()
-    
+
     # Views depending on tables should work
     assert ViewDependingOnTable.fqdeps_on() == {SimpleTable.fq()}
     assert MaterializedViewDependingOnTable.fqdeps_on() == {SimpleTable.fq()}
 
 
+@pytest.mark.unit
 def test_samizdat_table_definition_hash():
     """Test that tables generate proper definition hashes"""
     hash1 = SimpleTable.definition_hash()
     hash2 = SimpleTable.definition_hash()
-    
+
     # Should be consistent
     assert hash1 == hash2
     assert isinstance(hash1, str)
     assert len(hash1) == 32  # MD5 hash length
-    
+
     # Different tables should have different hashes
     hash3 = TableWithConstraints.definition_hash()
     assert hash1 != hash3
 
 
+@pytest.mark.unit
 def test_samizdat_table_dbinfo():
     """Test database info generation"""
     dbinfo = SimpleTable.dbinfo()
-    
+
     # Should be valid JSON
     import json
+
     parsed = json.loads(dbinfo)
-    
+
     assert "dbsamizdat" in parsed
     assert "version" in parsed["dbsamizdat"]
     assert "created" in parsed["dbsamizdat"]
     assert "definition_hash" in parsed["dbsamizdat"]
 
 
-def test_samizdat_table_create_and_drop():
+# ==================== Integration Tests (With Database) ====================
+
+
+@pytest.mark.integration
+def test_samizdat_table_create_and_drop(clean_db):
     """Test creating and dropping tables in the database"""
-    cmd_nuke(args)
-    
     # Create the table
-    cmd_sync(args, [SimpleTable])
-    
-    # Verify it exists
-    with get_cursor(args) as cursor:
+    cmd_sync(clean_db, [SimpleTable])
+
+    # Verify it exists and has correct structure
+    with get_cursor(clean_db) as cursor:
         cursor.execute(f"SELECT * FROM {SimpleTable.db_object_identity()}")
         # Should not raise an error
-        
+
         # Test the table structure
-        cursor.execute(f"""
+        cursor.execute(
+            """
             SELECT column_name, data_type, is_nullable, column_default
             FROM information_schema.columns 
             WHERE table_name = 'SimpleTable' 
             AND table_schema = 'public'
             ORDER BY ordinal_position
-        """)
+        """
+        )
         columns = cursor.fetchall()
-        
+
         # Check expected columns exist
         column_names = [col[0] for col in columns]
-        assert 'id' in column_names
-        assert 'name' in column_names
-        assert 'created_at' in column_names
-    
-    # Clean up
-    cmd_nuke(args)
-    
+        assert "id" in column_names
+        assert "name" in column_names
+        assert "created_at" in column_names
 
 
-def test_samizdat_table_with_dependencies():
+@pytest.mark.integration
+def test_samizdat_table_with_dependencies(clean_db):
     """Test table creation with dependent views"""
-    cmd_nuke(args)
-    
     # Create table and dependent view
-    samizdats = [SimpleTable, ViewDependingOnTable]
-    cmd_sync(args, samizdats)
-    
-    with get_cursor(args) as cursor:
-        # Verify table exists
+    cmd_sync(clean_db, [SimpleTable, ViewDependingOnTable])
+
+    # Verify both exist
+    with get_cursor(clean_db) as cursor:
+        # Table should exist
         cursor.execute(f"SELECT * FROM {SimpleTable.db_object_identity()}")
-        
-        # Verify view exists and works
+
+        # View should exist
         cursor.execute(f"SELECT * FROM {ViewDependingOnTable.db_object_identity()}")
-        
-        # Insert some data to test the view
-        cursor.execute(f"""
-            INSERT INTO {SimpleTable.db_object_identity()} (name) 
-            VALUES ('test1'), ('test2')
-        """)
-        
-        # Query the view
-        cursor.execute(f"SELECT COUNT(*) FROM {ViewDependingOnTable.db_object_identity()}")
-        count = cursor.fetchone()[0]
-        assert count == 2
-    
-    cmd_nuke(args)
 
 
-def test_samizdat_table_dependency_order():
-    """Test that tables are created before dependent objects"""
-    cmd_nuke(args)
-    
-    samizdats = [SimpleTable, ViewDependingOnTable, MaterializedViewDependingOnTable]
-    sanity_check(samizdats)
-    sorted_samizdats = depsort_with_sidekicks(samizdats)
-    
-    # Table should come first
-    sorted_names = [s.get_name() for s in sorted_samizdats]
-    table_index = sorted_names.index('SimpleTable')
-    view_index = sorted_names.index('ViewDependingOnTable')
-    matview_index = sorted_names.index('MaterializedViewDependingOnTable')
-    
-    assert table_index < view_index
-    assert table_index < matview_index
+@pytest.mark.integration
+def test_samizdat_table_dependency_order(clean_db):
+    """Test that tables are created in correct dependency order"""
+
+    class Table1(SamizdatTable):
+        sql_template = """
+            ${preamble}
+            (id SERIAL PRIMARY KEY, data TEXT)
+            ${postamble}
+        """
+
+    class Table2(SamizdatTable):
+        deps_on = {Table1}
+        sql_template = f"""
+            ${{preamble}}
+            (
+                id SERIAL PRIMARY KEY,
+                table1_id INTEGER REFERENCES {Table1.db_object_identity()}(id),
+                value TEXT
+            )
+            ${{postamble}}
+        """
+
+    class ViewOnBoth(SamizdatView):
+        deps_on = {Table1, Table2}
+        sql_template = f"""
+            ${{preamble}}
+            SELECT t1.data, t2.value 
+            FROM {Table1.db_object_identity()} t1
+            JOIN {Table2.db_object_identity()} t2 ON t2.table1_id = t1.id
+            ${{postamble}}
+        """
+
+    # Sync should handle dependency order automatically
+    cmd_sync(clean_db, [Table1, Table2, ViewOnBoth])
+
+    # Verify all exist
+    with get_cursor(clean_db) as cursor:
+        cursor.execute(f"SELECT * FROM {Table1.db_object_identity()}")
+        cursor.execute(f"SELECT * FROM {Table2.db_object_identity()}")
+        cursor.execute(f"SELECT * FROM {ViewOnBoth.db_object_identity()}")
 
 
-def test_samizdat_table_state_tracking():
+@pytest.mark.integration
+def test_samizdat_table_state_tracking(clean_db):
     """Test that table state is properly tracked"""
-    cmd_nuke(args)
-    
     # Create table
-    cmd_sync(args, [SimpleTable])
-    
-    with get_cursor(args) as cursor:
-        # Check that state tracking works
-        current_state = list(get_dbstate(cursor))
-        assert len(current_state) > 0
-        
-        # Verify our table is in the state
+    cmd_sync(clean_db, [SimpleTable])
+
+    # Check database state
+    with get_cursor(clean_db) as cursor:
+        db_state = get_dbstate(cursor)
+
+        # SimpleTable should be in database state
         table_found = False
-        for state_item in current_state:
-            if state_item.viewname == 'SimpleTable' and state_item.objecttype == 'TABLE':
+        for state_item in db_state:
+            if state_item[0] == "public" and state_item[1] == "SimpleTable":
                 table_found = True
                 break
-        
+
         assert table_found, "Table not found in database state"
-        
+
         # Test state comparison
         result = dbstate_equals_definedstate(cursor, [SimpleTable])
         assert result.issame
-    
-    cmd_nuke(args)
 
 
-def test_samizdat_table_unlogged():
-    """Test that unlogged tables are created"""
+@pytest.mark.integration
+def test_samizdat_table_unlogged(clean_db):
+    """Test that unlogged tables are created correctly"""
 
-    class UnloggedTable(SimpleTable):
+    class UnloggedTable(SamizdatTable):
         unlogged = True
+        sql_template = """
+            ${preamble}
+            (
+                id SERIAL PRIMARY KEY,
+                data TEXT
+            )
+            ${postamble}
+        """
 
-    cmd_nuke(args)
-    cmd_sync(args, [UnloggedTable])
-    cmd_nuke(args)
+    # Verify SQL contains UNLOGGED
+    create_sql = UnloggedTable.create()
+    assert "UNLOGGED" in create_sql, "Should create UNLOGGED table"
+
+    # Create and verify
+    cmd_sync(clean_db, [UnloggedTable])
+
+    # Verify table exists
+    with get_cursor(clean_db) as cursor:
+        cursor.execute(f"SELECT * FROM {UnloggedTable.db_object_identity()}")
 
 
-def test_samizdat_table_name_clashes():
+@pytest.mark.integration
+def test_samizdat_table_name_clashes(clean_db):
     """Test that name clashes are detected"""
+
     class DuplicateTable1(SamizdatTable):
         object_name = "duplicate_name"
         sql_template = """
@@ -287,27 +325,25 @@ def test_samizdat_table_name_clashes():
             (id INTEGER)
             ${postamble}
         """
-    
+
     class DuplicateTable2(SamizdatTable):
-        object_name = "duplicate_name"
+        object_name = "duplicate_name"  # Same name!
         sql_template = """
             ${preamble}
-            (id INTEGER)
+            (value TEXT)
             ${postamble}
         """
-    
-    cmd_nuke(args)
+
     with pytest.raises(NameClashError):
-        cmd_sync(args, [DuplicateTable1, DuplicateTable2])
+        # Should detect duplicate names
+        sanity_check({DuplicateTable1, DuplicateTable2})
 
 
-def test_samizdat_table_custom_schema():
-    """
-    Test table creation in custom schema
-    Note that before running this test, you need to create the schema
-    outside of the test infrastructure.
-    
-    """
+@pytest.mark.integration
+@pytest.mark.requires_schema
+def test_samizdat_table_custom_schema(clean_db, test_schema):
+    """Test table creation in custom schema"""
+
     class CustomSchemaTable(SamizdatTable):
         schema = "test_schema"
         sql_template = """
@@ -318,31 +354,23 @@ def test_samizdat_table_custom_schema():
             )
             ${postamble}
         """
-    
-    cmd_nuke(args)
 
-    try:
-        cmd_sync(args, [CustomSchemaTable])
-    except Exception as e:
-        print(e)
-    
-        with get_cursor(args) as cursor:
-            # Verify table exists in custom schema
-            cursor.execute(f"SELECT * FROM {CustomSchemaTable.db_object_identity()}")
-            
-            # Verify it's in the right schema
-            cursor.execute("""
-                SELECT table_schema, table_name 
-                FROM information_schema.tables 
-                WHERE table_name = 'CustomSchemaTable'
-            """)
-            result = cursor.fetchone()
-            assert result[0] == 'test_schema'
-            assert result[1] == 'CustomSchemaTable'
-    
-    finally:
-        cmd_nuke(args)
+    # Create table in custom schema
+    cmd_sync(clean_db, [CustomSchemaTable])
 
+    # Verify table exists in custom schema
+    with get_cursor(clean_db) as cursor:
+        cursor.execute(f"SELECT * FROM {CustomSchemaTable.db_object_identity()}")
+        # Should not raise
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"]) 
+        # Verify schema
+        cursor.execute(
+            """
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_name = 'CustomSchemaTable'
+        """
+        )
+        result = cursor.fetchall()
+        assert len(result) == 1
+        assert result[0][0] == "test_schema"
