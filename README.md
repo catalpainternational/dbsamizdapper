@@ -50,6 +50,11 @@ This fork is based on a rewrite which I did to better understand the internals o
  - Type hints throughout the codebase
  - Changed from `ABC` to `Protocol` type for inheritance
  - UV for fast dependency management
+ - **Django QuerySet integration** (new in 0.0.5)
+   - `SamizdatQuerySet` - Create views from Django QuerySets
+   - `SamizdatMaterializedQuerySet` - Materialized views from QuerySets
+   - `SamizdatModel` - Unmanaged Django models as views
+   - `SamizdatMaterializedModel` - Materialized views from models
  - Compat with both `psycopg` and `psycopg3`
  - Opinionated code formatting
    - black + isort
@@ -57,6 +62,24 @@ This fork is based on a rewrite which I did to better understand the internals o
  - some simple `pytest` functions
 
 and probably many more undocumented changes
+
+### Django QuerySet Example
+
+```python
+from dbsamizdat import SamizdatMaterializedQuerySet
+from myapp.models import MyModel
+
+class MyComplexView(SamizdatMaterializedQuerySet):
+    """Create a materialized view from a complex QuerySet"""
+    queryset = MyModel.objects.select_related('related').filter(
+        active=True
+    ).annotate(
+        custom_field=F('field1') + F('field2')
+    )
+    
+    # Optionally specify tables that trigger refresh
+    refresh_triggers = [("myapp", "mymodel")]
+```
 
 
 ## Development Commands
