@@ -122,6 +122,7 @@ def test_code_generation():
     # A materialized view
 
 
+@pytest.mark.skip(reason="PostgreSQL function inlining issue with matviews - see issue #5")
 def test_create_view():
     cmd_nuke(args)
     # What are the dependencies of `MaterializedThing`?
