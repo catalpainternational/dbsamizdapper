@@ -7,15 +7,22 @@ from json import dumps as jsondumps
 from string import Template
 from time import time as now
 
-from dbsamizdat.samtypes import FQTuple, HasRefreshTriggers, HasSidekicks, Mogrifier, ProtoSamizdat, entitypes
+from dbsamizdat.samtypes import (
+    FQTuple,
+    HasRefreshTriggers,
+    HasSidekicks,
+    Mogrifier,
+    ProtoSamizdat,
+    entitypes,
+    sql_query,
+)
 
 from .util import nodenamefmt
 
 if typing.TYPE_CHECKING:
     try:
-        from django.db import connection  # noqa: F401
-        from django.db.models import QuerySet
-    except ModuleNotFoundError:
+        from django.db.models import Model, QuerySet
+    except (ModuleNotFoundError, ImportError):
         pass
 
 _DBINFO_VERSION = 1  # Version number for signature format. For future use
@@ -160,7 +167,13 @@ class SamizdatFunction(Samizdat):
 
         # "Functions" adapt the hash to include creation options
         return md5(
-            "|".join([cls.get_sql_template(), cls.db_object_identity(), cls.creation_identity()]).encode("utf-8")
+            "|".join(
+                [
+                    cls.get_sql_template(),
+                    cls.db_object_identity(),
+                    cls.creation_identity(),
+                ]
+            ).encode("utf-8")
         ).hexdigest()
 
     @classmethod
@@ -201,7 +214,10 @@ class SamizdatTrigger(Samizdat):
         in the fully qualified name.
         """
 
-        return FQTuple(schema=FQTuple.fqify(cls.on_table).db_object_identity(), object_name=cls.get_name())
+        return FQTuple(
+            schema=FQTuple.fqify(cls.on_table).db_object_identity(),
+            object_name=cls.get_name(),
+        )
 
     def __str__(self):
         return nodenamefmt(self.fq())
@@ -345,7 +361,7 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
         yield from cls.gen_refresh_tabletriggers(counter=counter)
 
 
-class SamizdatMaterializedQuerySet(SamizdatMaterializedView):
+class SamizdatQuerySet(Samizdat):
     """
     Class to convert a Django queryset into a materialized view
     Primarily this is to simplify deeply nested Django operations
@@ -354,23 +370,74 @@ class SamizdatMaterializedQuerySet(SamizdatMaterializedView):
     queryset: QuerySet
 
     @classmethod
-    def _get_query(cls):
+    def get_queryset(cls):
+        return cls.queryset
+
+    @classmethod
+    def sql_template(cls):
+        return f"""${{preamble}} {cls.get_query(cls.get_queryset())} ${{postamble}}"""
+
+    @classmethod
+    def get_query(cls, queryset: QuerySet) -> sql_query:
         """
         Returns the query, as a string
         """
-        try:
-            from django.db import connection  # noqa: F811
-        except ModuleNotFoundError as E:
-            raise ModuleNotFoundError("Django is required for a materialized queryset") from E
+        from django.db import connection  # noqa: F811
 
         with connection.cursor() as c:
-            query = c.mogrify(*cls.queryset.query.sql_with_params())
+            query = c.mogrify(*queryset.query.sql_with_params())
             if isinstance(query, bytes):
                 # Some psycopg2 flavours will give str, others bytes
                 # force consistency
                 query = query.decode()
         return query
 
+
+class SamizdatMaterializedQuerySet(SamizdatQuerySet, SamizdatMaterializedView):
+    entity_type = entitypes.MATVIEW
+
+
+class SamizdatModel(SamizdatQuerySet):
+    """
+    This is an abstraction around relating a Django unmanaged model
+    to a Materialized View, defined as a Django 'query' instance.
+
+    The class takes two parameters: a "model" instance
+    and a "queryset".
+
+    The fields returned
+    """
+
+    model: Model
+
     @classmethod
-    def sql_template(cls):
-        return f"""${{preamble}} {cls._get_query()} ${{postamble}}"""
+    def _add_id(cls, queryset: QuerySet):
+        """
+        Auto add an "id" column;
+        this is required for Django's admin to
+        function correctly as it uses the primary key
+        to add a detail view
+        """
+        from django.db.models.expressions import Window
+        from django.db.models.functions import RowNumber
+
+        return queryset.annotate(id=Window(expression=RowNumber()))
+
+    @classmethod
+    def get_queryset(cls):
+        """
+        Get the 'values' associted with the fields defined on the model
+        """
+        fields = [field.attname for field in cls.model._meta.get_fields()]
+        return cls._add_id(cls.queryset).values(*fields)
+
+    @classmethod
+    def get_name(cls):
+        """
+        Use the name as Django defined it
+        """
+        return cls.model._meta.db_table
+
+
+class SamizdatMaterializedModel(SamizdatModel, SamizdatMaterializedView):
+    entity_type = entitypes.MATVIEW

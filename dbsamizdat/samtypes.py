@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Iterable, Type
+from typing import Any, Callable, Iterable, Protocol, Type
 
 from dbsamizdat.exceptions import UnsuitableNameError
 
@@ -88,6 +88,11 @@ class FQTuple:
             Convert a Samizdat like instance
             """
             return arg.fq()
+
+        elif hasattr(arg, "_meta"):
+            # If a django-like instance with a `_meta` prop is provided
+            # use its db_table to determine a fully qualified name
+            return cls.fqify(arg._meta.db_table)
 
         else:
             raise TypeError
@@ -227,7 +232,19 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
     def head_id(cls) -> str: ...
 
 
-FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | Type[ProtoSamizdat] | tuple[str, ...]
+class DjangoModelMeta(Protocol):
+    db_table: str
+
+
+class DjangoModelLike(Protocol):
+    """
+    Allow passing a Django model where an "FQIffable" instance is expected
+    """
+
+    _meta: DjangoModelMeta
+
+
+FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | Type[ProtoSamizdat] | tuple[str, ...] | DjangoModelLike
 
 
 class HasSidekicks(ABC):
