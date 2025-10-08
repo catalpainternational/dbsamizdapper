@@ -106,8 +106,9 @@ class Samizdat(ProtoSamizdat):
         """
         SQL to create this DB object
         """
+        _AS = "" if cls.entity_type.name == "TABLE" else " AS "
         subst = dict(
-            preamble=f"""CREATE {cls.entity_type.value} {cls.db_object_identity()} AS""",
+            preamble=f"""CREATE {cls.entity_type.value} {cls.db_object_identity()}{_AS}""",
             postamble="WITH NO DATA" if sd_is_matview(cls) else "",
             samizdatname=cls.db_object_identity(),
         )
@@ -127,6 +128,10 @@ class Samizdat(ProtoSamizdat):
 
 class SamizdatView(Samizdat):
     entity_type = entitypes.VIEW
+
+
+class SamizdatTable(Samizdat):
+    entity_type = entitypes.TABLE
 
 
 class SamizdatFunction(Samizdat):

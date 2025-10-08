@@ -12,6 +12,7 @@ from dbsamizdat.samizdat import (
     SamizdatMaterializedView,
     SamizdatModel,
     SamizdatQuerySet,
+    SamizdatTable,
     SamizdatTrigger,
     SamizdatView,
 )
@@ -24,6 +25,7 @@ SamizType = Type[
     | SamizdatMaterializedView
     | SamizdatModel
     | SamizdatQuerySet
+    | SamizdatTable
     | SamizdatTrigger
     | SamizdatView
 ]
@@ -47,6 +49,7 @@ def filter_sds(inputklass: Any) -> TypeGuard[SamizType]:
         SamizdatMaterializedView,
         SamizdatModel,
         SamizdatQuerySet,
+        SamizdatTable,
         SamizdatTrigger,
         SamizdatView,
     )

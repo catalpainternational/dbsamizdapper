@@ -1,7 +1,7 @@
 from importlib import import_module
 
 from dbsamizdat.loader import samizdats_in_app, samizdats_in_module
-from sample_app.dbsamizdat_defs import AView
+from sample_app.dbsamizdat_defs import AView, ExampleTable, ViewOnTable
 
 
 def test_load_from_module():
@@ -10,7 +10,7 @@ def test_load_from_module():
 
 
 def test_import_from_app():
-    assert set(samizdats_in_app("sample_app")) == {AView}
+    assert set(samizdats_in_app("sample_app")) == {AView, ExampleTable, ViewOnTable}
 
 
 def test_autodiscover():
