@@ -11,25 +11,13 @@ import sys
 from collections.abc import Generator
 from logging import getLogger
 from time import monotonic
-from typing import Literal
 
 from ..libgraph import depsort_with_sidekicks, sanity_check
 from ..loader import SamizType, autodiscover_samizdats, get_samizdats
+from .types import ArgType
 
 logger = getLogger(__name__)
 PRINTKWARGS = dict(file=sys.stderr, flush=True)
-
-
-# Import ArgType from types module (to be created)
-class ArgType:
-    """
-    Temporary import location - will be moved to types module.
-    This allows helpers.py to work independently.
-    """
-
-    txdiscipline: Literal["checkpoint", "jumbo", "dryrun"] | None = "dryrun"
-    verbosity: int = 1
-    log_rather_than_print: bool = True
 
 
 def vprint(args: ArgType, *pargs, **pkwargs):
