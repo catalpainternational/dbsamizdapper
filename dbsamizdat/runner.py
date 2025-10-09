@@ -2,12 +2,13 @@ import argparse
 import os
 import sys
 import typing
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from enum import Enum
 from importlib.util import find_spec
 from logging import getLogger
 from time import monotonic
-from typing import Generator, Iterable, Literal
+from typing import Literal
 
 import dotenv
 
@@ -32,7 +33,7 @@ class txstyle(Enum):
     DRYRUN = "dryrun"
 
 
-ACTION = Literal["create", "nuke", "update", "refresh", "drop", "sign"]
+type ACTION = Literal["create", "nuke", "update", "refresh", "drop", "sign"]
 
 logger = getLogger(__name__)
 PRINTKWARGS = dict(file=sys.stderr, flush=True)

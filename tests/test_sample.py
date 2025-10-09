@@ -264,7 +264,7 @@ def test_sidekicks(clean_db, refresh_trigger_tables):
     with get_cursor(clean_db) as cursor:
         cursor.execute("INSERT INTO d SELECT now()")
         # No manual COMMIT - get_cursor() handles it automatically
-    
+
     # Query in separate transaction to see refreshed data
     with get_cursor(clean_db) as cursor:
         cursor.execute("""SELECT * FROM public."Treater" """)
