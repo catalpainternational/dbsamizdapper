@@ -30,15 +30,17 @@ git clone <repo-url>
 cd dbsamizdapper
 
 # Install dependencies (includes dev tools)
-uv sync --extra dev --extra testing
+uv sync --group dev --group testing
 
 # Optional: Install Django type stubs for Django integration development
-uv sync --extra dev --extra testing --extra django
+uv sync --group dev --group testing --extra django
 ```
 
-**Available extras:**
-- `dev` - Development tools (black, isort, flake8, mypy, pytest, etc.)
-- `testing` - PostgreSQL testing with psycopg2-binary
+**Available dependency groups (development):**
+- `dev` - Development tools (black, isort, flake8, mypy, etc.)
+- `testing` - Test framework and PostgreSQL testing with psycopg2-binary
+
+**Available extras (optional runtime features):**
 - `django` - Django 4.2 and type stubs for Django integration
 - `psycopg3` - Use psycopg3 instead of psycopg2
 
@@ -50,6 +52,14 @@ This fork is based on a rewrite which I did to better understand the internals o
  - Type hints throughout the codebase
  - Changed from `ABC` to `Protocol` type for inheritance
  - UV for fast dependency management
+ - **Table Management** (new in 0.0.6)
+   - `SamizdatTable` - Manage database tables as Samizdat objects
+   - UNLOGGED table support for performance-critical use cases
+ - **Django QuerySet integration** (0.0.5)
+   - `SamizdatQuerySet` - Create views from Django QuerySets
+   - `SamizdatMaterializedQuerySet` - Materialized views from QuerySets
+   - `SamizdatModel` - Unmanaged Django models as views
+   - `SamizdatMaterializedModel` - Materialized views from models
  - Compat with both `psycopg` and `psycopg3`
  - Opinionated code formatting
    - black + isort
@@ -57,6 +67,51 @@ This fork is based on a rewrite which I did to better understand the internals o
  - some simple `pytest` functions
 
 and probably many more undocumented changes
+
+### Table Management Example
+
+```python
+from dbsamizdat import SamizdatTable
+
+class MyTable(SamizdatTable):
+    """Manage a table as a Samizdat object"""
+    sql_template = """
+    CREATE TABLE ${samizdatname} (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """
+
+class MyCacheTable(SamizdatTable):
+    """UNLOGGED table for better performance"""
+    unlogged = True
+    sql_template = """
+    CREATE TABLE ${samizdatname} (
+        key TEXT PRIMARY KEY,
+        value JSONB,
+        expires_at TIMESTAMP
+    )
+    """
+```
+
+### Django QuerySet Example
+
+```python
+from dbsamizdat import SamizdatMaterializedQuerySet
+from myapp.models import MyModel
+
+class MyComplexView(SamizdatMaterializedQuerySet):
+    """Create a materialized view from a complex QuerySet"""
+    queryset = MyModel.objects.select_related('related').filter(
+        active=True
+    ).annotate(
+        custom_field=F('field1') + F('field2')
+    )
+    
+    # Optionally specify tables that trigger refresh
+    refresh_triggers = [("myapp", "mymodel")]
+```
 
 
 ## Development Commands
@@ -81,8 +136,9 @@ uv build
 
 ## Running Tests
 
-Spin up a docker container
+Spin up a podman or docker container
 
+`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
 `docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
 
 The db url for this container would be:

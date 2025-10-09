@@ -2,12 +2,35 @@ import inspect
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Any, Type, TypeGuard
+from typing import Any, TypeGuard
 
-from dbsamizdat.samizdat import Samizdat, SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
+from dbsamizdat.samizdat import (
+    Samizdat,
+    SamizdatFunction,
+    SamizdatMaterializedModel,
+    SamizdatMaterializedQuerySet,
+    SamizdatMaterializedView,
+    SamizdatModel,
+    SamizdatQuerySet,
+    SamizdatTable,
+    SamizdatTrigger,
+    SamizdatView,
+)
 
-SamizType = Type[SamizdatFunction | SamizdatView | SamizdatMaterializedView | SamizdatTrigger]
-SamizTypes = set[SamizType]
+type SamizType = type[
+    Samizdat
+    | SamizdatFunction
+    | SamizdatMaterializedModel
+    | SamizdatMaterializedQuerySet
+    | SamizdatMaterializedView
+    | SamizdatModel
+    | SamizdatQuerySet
+    | SamizdatTable
+    | SamizdatTrigger
+    | SamizdatView
+]
+
+type SamizTypes = set[SamizType]
 
 logger = getLogger(__name__)
 
@@ -21,9 +44,14 @@ def filter_sds(inputklass: Any) -> TypeGuard[SamizType]:
     """
     subclasses_of = (
         SamizdatFunction,
-        SamizdatView,
+        SamizdatMaterializedModel,
+        SamizdatMaterializedQuerySet,
         SamizdatMaterializedView,
+        SamizdatModel,
+        SamizdatQuerySet,
+        SamizdatTable,
         SamizdatTrigger,
+        SamizdatView,
     )
     return inspect.isclass(inputklass) and issubclass(inputklass, subclasses_of) and inputklass not in subclasses_of
 

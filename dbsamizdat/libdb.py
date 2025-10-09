@@ -1,12 +1,13 @@
 import warnings
+from collections.abc import Iterable
 from enum import IntFlag
 from json import loads as jsonloads
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 from dbsamizdat.loader import SamizType, filter_sds
 from dbsamizdat.samizdat import Samizdat
 
-from . import SamizdatFunction, SamizdatMaterializedView, SamizdatTrigger, SamizdatView
+from . import SamizdatFunction, SamizdatMaterializedView, SamizdatTable, SamizdatTrigger, SamizdatView
 from .samtypes import Cursor, entitypes
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
@@ -17,8 +18,8 @@ class DBObjectType(IntFlag):
     FOREIGN = 2
 
 
-name = str
-hash_ = str
+type name = str
+type hash_ = str
 
 
 class StateTuple(NamedTuple):
@@ -68,6 +69,20 @@ def get_dbstate(
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             WHERE c.relkind = 'm'
+                AND n.nspname <> 'pg_catalog'
+                AND n.nspname <> 'information_schema'
+                AND n.nspname !~ '^pg_toast'
+            """,
+        entitypes.TABLE: """
+            SELECT n.nspname AS schemaname,
+                c.relname AS viewname,
+                'TABLE' as objecttype,
+                pg_catalog.obj_description(c.oid, 'pg_class') AS commentcontent,
+                NULL as args,
+                NULL as definition_hash
+            FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind = 'r'
                 AND n.nspname <> 'pg_catalog'
                 AND n.nspname <> 'information_schema'
                 AND n.nspname !~ '^pg_toast'
@@ -129,6 +144,7 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
         for c in (
             SamizdatView,
             SamizdatMaterializedView,
+            SamizdatTable,
             SamizdatFunction,
             SamizdatTrigger,
         )

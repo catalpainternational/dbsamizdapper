@@ -1,8 +1,8 @@
 from collections import Counter
+from collections.abc import Iterable
 from functools import reduce
 from itertools import chain
 from operator import or_
-from typing import Iterable
 
 from toposort import CircularDependencyError, toposort
 
