@@ -175,3 +175,4 @@ def test_multiple_cursor_types_work(db_args):
         cursor.execute("SELECT * FROM test_table WHERE id = %s", (2,))
         result = cursor.fetchone()
         assert result[0] == 2
+
