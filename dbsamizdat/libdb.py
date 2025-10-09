@@ -1,7 +1,8 @@
 import warnings
+from collections.abc import Iterable
 from enum import IntFlag
 from json import loads as jsonloads
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 from dbsamizdat.loader import SamizType, filter_sds
 from dbsamizdat.samizdat import Samizdat
@@ -17,8 +18,8 @@ class DBObjectType(IntFlag):
     FOREIGN = 2
 
 
-name = str
-hash_ = str
+type name = str
+type hash_ = str
 
 
 class StateTuple(NamedTuple):

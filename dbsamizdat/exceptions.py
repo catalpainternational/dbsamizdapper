@@ -1,6 +1,3 @@
-from typing import List
-
-
 def sqlfmt(sql: str):
     return "\n".join(("\t\t" + line for line in sql.splitlines()))
 
@@ -65,7 +62,7 @@ class DependencyCycleError(SamizdatException):
 
 
 class FunctionSignatureError(SamizdatException):
-    def __init__(self, samizdat, candidate_arguments: List[str]):
+    def __init__(self, samizdat, candidate_arguments: list[str]):
         self.samizdat = samizdat
         self.candidate_arguments = candidate_arguments
 

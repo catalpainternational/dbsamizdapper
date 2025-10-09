@@ -2,7 +2,7 @@ import inspect
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Any, Type, TypeGuard
+from typing import Any, TypeGuard
 
 from dbsamizdat.samizdat import (
     Samizdat,
@@ -17,7 +17,7 @@ from dbsamizdat.samizdat import (
     SamizdatView,
 )
 
-SamizType = Type[
+type SamizType = type[
     Samizdat
     | SamizdatFunction
     | SamizdatMaterializedModel
@@ -30,7 +30,7 @@ SamizType = Type[
     | SamizdatView
 ]
 
-SamizTypes = set[SamizType]
+type SamizTypes = set[SamizType]
 
 logger = getLogger(__name__)
 

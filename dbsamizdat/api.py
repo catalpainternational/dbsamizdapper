@@ -3,7 +3,7 @@ API for using dbsamizdat as a library
 """
 
 import os
-from typing import Iterable, Union
+from collections.abc import Iterable
 
 from .runner import ArgType
 from .runner import cmd_nuke as _cmd_nuke
@@ -31,7 +31,7 @@ _CMD_ARG_DEFAULTS = dict(
 def refresh(
     dburl: str | None = DEFAULT_URL,
     transaction_style: txstyle = txstyle.JUMBO,
-    belownodes: Iterable[Union[str, tuple, Samizdat]] = tuple(),
+    belownodes: Iterable[str | tuple | Samizdat] = tuple(),
 ):
     """
     Refresh materialized views, in dependency order, optionally restricted

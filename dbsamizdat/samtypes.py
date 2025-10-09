@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Iterable, Protocol, Type
+from typing import Any, Protocol
 
 from dbsamizdat.exceptions import UnsuitableNameError
 
@@ -98,9 +99,9 @@ class FQTuple:
             raise TypeError
 
 
-objectname = str
-schemaname = str
-sql_query = str
+type objectname = str
+type schemaname = str
+type sql_query = str
 
 
 class SqlGeneration(ABC):
@@ -247,7 +248,7 @@ class DjangoModelLike(Protocol):
     _meta: DjangoModelMeta
 
 
-FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | Type[ProtoSamizdat] | tuple[str, ...] | DjangoModelLike
+type FQIffable = FQTuple | HasFQ | str | ProtoSamizdat | type[ProtoSamizdat] | tuple[str, ...] | DjangoModelLike
 
 
 class HasSidekicks(ABC):
@@ -262,30 +263,62 @@ class HasSidekicks(ABC):
     def sidekicks(cls) -> Iterable["ProtoSamizdat"]: ...
 
 
-class Mogrifier(ABC):
+class Mogrifier(Protocol):
     """
-    A class which can "mogrify" a SQL string
-    This helps to differentiate between psycopg & pscyopg2 'Cursur
+    Duck-typed interface for psycopg/psycopg2 cursor parameter escaping.
+
+    This is a Protocol (not ABC) because we don't control the cursor
+    implementations (psycopg2, psycopg3, Django). Structural typing
+    allows all three to work without modification.
+
+    Compatible with:
+    - psycopg2.extensions.cursor
+    - psycopg.ClientCursor
+    - Django connection cursor
     """
 
-    @abstractmethod
-    def mogrify(self, *args, **kwargs) -> str | bytes: ...
+    def mogrify(self, query: str, params: tuple = ()) -> str | bytes:
+        """Convert query and parameters to raw SQL string"""
+        ...
 
     @property
-    def connection(self) -> Any: ...
+    def connection(self) -> Any:
+        """Database connection this cursor belongs to"""
+        ...
 
 
-class Cursor(Mogrifier):
+class Cursor(Mogrifier, Protocol):
     """
-    Approximately define what you need in a 'cursor' class
+    Duck-typed database cursor interface for type-safe multi-driver support.
+
+    This is a Protocol (not ABC) because we don't control the cursor
+    implementations (psycopg2, psycopg3, Django). Structural typing
+    allows all three to work without modification.
+
+    Compatible with:
+    - psycopg2.extensions.cursor
+    - psycopg.Cursor
+    - psycopg.ClientCursor
+    - Django connection cursor.cursor
+
+    Example:
+        def my_function(cursor: Cursor):
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
     """
 
-    def execute(self, str) -> None: ...
+    def execute(self, query: str, params: tuple = ()) -> None:
+        """Execute a database query"""
+        ...
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        """Close the cursor"""
+        ...
 
-    @abstractmethod
-    def fetchall(self) -> list: ...
+    def fetchall(self) -> list[tuple]:
+        """Fetch all rows from last query"""
+        ...
 
-    @abstractmethod
-    def fetchone(self) -> tuple: ...
+    def fetchone(self) -> tuple | None:
+        """Fetch one row from last query"""
+        ...

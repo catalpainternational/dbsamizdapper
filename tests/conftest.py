@@ -65,16 +65,16 @@ def clean_db(db_args):
 def db_cursor(db_args):
     """
     Provide a database cursor for a single operation.
-    
+
     Opens its own connection and transaction.
     Use this for simple queries that don't conflict with cmd_sync/cmd_nuke.
-    
+
     Usage:
         def test_something(db_cursor):
             db_cursor.execute("SELECT ...")
     """
     from dbsamizdat.runner import get_cursor
-    
+
     with get_cursor(db_args) as cursor:
         yield cursor
 
@@ -174,7 +174,7 @@ def refresh_trigger_tables(db_args):
     # Clean up any existing tables first
     with get_cursor(db_args) as cursor:
         cursor.execute("DROP TABLE IF EXISTS d, d2 CASCADE")
-    
+
     # Create tables
     with get_cursor(db_args) as cursor:
         cursor.execute("CREATE TABLE d AS SELECT now() AS n")
