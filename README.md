@@ -30,15 +30,17 @@ git clone <repo-url>
 cd dbsamizdapper
 
 # Install dependencies (includes dev tools)
-uv sync --extra dev --extra testing
+uv sync --group dev --group testing
 
 # Optional: Install Django type stubs for Django integration development
-uv sync --extra dev --extra testing --extra django
+uv sync --group dev --group testing --extra django
 ```
 
-**Available extras:**
-- `dev` - Development tools (black, isort, flake8, mypy, pytest, etc.)
-- `testing` - PostgreSQL testing with psycopg2-binary
+**Available dependency groups (development):**
+- `dev` - Development tools (black, isort, flake8, mypy, etc.)
+- `testing` - Test framework and PostgreSQL testing with psycopg2-binary
+
+**Available extras (optional runtime features):**
 - `django` - Django 4.2 and type stubs for Django integration
 - `psycopg3` - Use psycopg3 instead of psycopg2
 
