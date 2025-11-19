@@ -147,7 +147,7 @@ def test_cursor_type_annotations():
     from dbsamizdat.samtypes import Cursor
 
     # Get type hints
-    hints = typing.get_type_hints(Cursor.execute) if hasattr(Cursor, "execute") else {}
+    typing.get_type_hints(Cursor.execute) if hasattr(Cursor, "execute") else {}
 
     # After moving to Protocol, we should still have type hints
     # This test documents expected behavior
@@ -175,4 +175,3 @@ def test_multiple_cursor_types_work(db_args):
         cursor.execute("SELECT * FROM test_table WHERE id = %s", (2,))
         result = cursor.fetchone()
         assert result[0] == 2
-

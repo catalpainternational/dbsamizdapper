@@ -2,7 +2,7 @@ name: Python
 
 
 env:
-  DB_URL: postgresql:///postgres@localhost:5435/postgres
+  DB_URL: postgresql://postgres@localhost:5435/postgres
 
 on:
   push:
@@ -48,18 +48,18 @@ jobs:
 
     # Service containers to run postgres
     services:
-        # Label used to access the service container
-        postgres:
-            # Docker Hub image
-            image: postgres:15
-            # Provide the password for postgres. Should be sync'ed with test_settings file
-            env:
-                POSTGRES_HOST_AUTH_METHOD: trust
-            # Set health checks to wait until postgres has started
-            options: >-
-                --health-cmd pg_isready
-                --health-interval 10s
-                --health-timeout 5s
-                --health-retries 5
-            ports:
-                - 5435:5432
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:15
+        # Provide the password for postgres. Should be sync'ed with test_settings file
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5435:5432

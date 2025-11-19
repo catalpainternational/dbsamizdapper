@@ -4,7 +4,7 @@ import pytest
 
 from dbsamizdat.exceptions import NameClashError, UnsuitableNameError
 from dbsamizdat.libdb import dbstate_equals_definedstate, get_dbstate
-from dbsamizdat.libgraph import depsort_with_sidekicks, sanity_check
+from dbsamizdat.libgraph import sanity_check
 from dbsamizdat.runner import cmd_sync, get_cursor
 from dbsamizdat.samizdat import SamizdatMaterializedView, SamizdatTable, SamizdatView
 from dbsamizdat.samtypes import FQTuple, entitypes
@@ -59,7 +59,7 @@ class MaterializedViewDependingOnTable(SamizdatMaterializedView):
     deps_on = {SimpleTable}
     sql_template = f"""
         ${{preamble}}
-        SELECT 
+        SELECT
             COUNT(*) as total_records,
             COUNT(DISTINCT name) as unique_names
         FROM {SimpleTable.db_object_identity()}
@@ -190,8 +190,8 @@ def test_samizdat_table_create_and_drop(clean_db):
         cursor.execute(
             """
             SELECT column_name, data_type, is_nullable, column_default
-            FROM information_schema.columns 
-            WHERE table_name = 'SimpleTable' 
+            FROM information_schema.columns
+            WHERE table_name = 'SimpleTable'
             AND table_schema = 'public'
             ORDER BY ordinal_position
         """
@@ -247,7 +247,7 @@ def test_samizdat_table_dependency_order(clean_db):
         deps_on = {Table1, Table2}
         sql_template = f"""
             ${{preamble}}
-            SELECT t1.data, t2.value 
+            SELECT t1.data, t2.value
             FROM {Table1.db_object_identity()} t1
             JOIN {Table2.db_object_identity()} t2 ON t2.table1_id = t1.id
             ${{postamble}}

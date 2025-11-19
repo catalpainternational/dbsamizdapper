@@ -237,7 +237,7 @@ class TestDjangoTypeProtocols:
         """Test DjangoModelMeta protocol"""
         from django.db import models
 
-        from dbsamizdat.samtypes import DjangoModelLike
+        from dbsamizdat.samtypes import DjangoModelLike  # noqa: F401
 
         class TestModel(models.Model):
             name = models.CharField(max_length=100)

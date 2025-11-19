@@ -2,7 +2,7 @@ import inspect
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Any, TypeGuard
+from typing import Any, TypeGuard, Iterable
 
 from dbsamizdat.samizdat import (
     Samizdat,
@@ -56,7 +56,7 @@ def filter_sds(inputklass: Any) -> TypeGuard[SamizType]:
     return inspect.isclass(inputklass) and issubclass(inputklass, subclasses_of) and inputklass not in subclasses_of
 
 
-def get_samizdats():
+def get_samizdats() -> Iterable[SamizType]:
     """
     Returns all subclasses of "Samizdat"
     where they are not considered abstract

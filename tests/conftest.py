@@ -131,18 +131,18 @@ def fruit_pet_tables(db_args):
                 id integer PRIMARY KEY,
                 name varchar(100)
             );
-            
+
             INSERT INTO "Fruit" VALUES
                 (1, 'banana'),
                 (2, 'pear'),
                 (3, 'apple'),
                 (4, 'rambutan');
-            
+
             CREATE TABLE "Pet" (
                 id integer PRIMARY KEY,
                 name varchar(100)
             );
-            
+
             INSERT INTO "Pet" VALUES
                 (1, 'ocelot'),
                 (2, 'khoi carp'),

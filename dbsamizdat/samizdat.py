@@ -6,7 +6,7 @@ from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
-from typing import Any, TypeGuard
+from typing import Any, TypeGuard, Iterable
 
 from dbsamizdat.samtypes import (
     FQTuple,
@@ -16,6 +16,7 @@ from dbsamizdat.samtypes import (
     ProtoSamizdat,
     entitypes,
     sql_query,
+    FQIffable,
 )
 
 from .util import nodenamefmt
@@ -211,7 +212,7 @@ class SamizdatTrigger(Samizdat):
     """
 
     entity_type = entitypes.TRIGGER
-    on_table: str
+    on_table: str | FQIffable
     condition: str | None = None
     autorefresher = False
     # schema inherited from Samizdat (defaults to "public")
@@ -369,7 +370,7 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
                 )
 
     @classmethod
-    def sidekicks(cls):
+    def sidekicks(cls) -> Iterable[SamizdatFunction | SamizdatTrigger]:
         """
         Yields "functions" and "triggers"
         to help manage this Materialized View

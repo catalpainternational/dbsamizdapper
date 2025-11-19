@@ -9,9 +9,6 @@ Tests can now import from either:
 - dbsamizdat.runner.helpers (new location - after refactoring)
 """
 
-import sys
-from io import StringIO
-
 import pytest
 
 # Try new location first, fall back to old if needed

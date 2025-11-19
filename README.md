@@ -138,7 +138,7 @@ uv build
 
 Spin up a podman or docker container
 
-`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
+`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres`
 `docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
 
 The db url for this container would be:

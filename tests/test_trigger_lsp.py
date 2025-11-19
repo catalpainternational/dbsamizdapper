@@ -7,8 +7,8 @@ to fix the Liskov Substitution Principle violation.
 
 import pytest
 
-from dbsamizdat.exceptions import DanglingReferenceError
-from dbsamizdat.libgraph import sanity_check
+from dbsamizdat.exceptions import DanglingReferenceError  # noqa: F401
+from dbsamizdat.libgraph import sanity_check  # noqa: F401
 from dbsamizdat.runner import cmd_sync, get_cursor
 from dbsamizdat.samizdat import (
     SamizdatFunction,
@@ -16,7 +16,7 @@ from dbsamizdat.samizdat import (
     SamizdatTable,
     SamizdatTrigger,
 )
-from dbsamizdat.samtypes import FQTuple, entitypes
+from dbsamizdat.samtypes import entitypes  # noqa: F401
 
 # ==================== Test Trigger Definitions ====================
 
