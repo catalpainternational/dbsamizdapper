@@ -3,6 +3,7 @@ from dbsamizdat.samizdat import SamizdatView, SamizdatTable
 
 class ExampleTable(SamizdatTable):
     """Example table demonstrating SamizdatTable usage"""
+
     sql_template = """
         ${preamble}
         (
@@ -25,6 +26,7 @@ class AView(SamizdatView):
 
 class ViewOnTable(SamizdatView):
     """Example view that depends on the table"""
+
     deps_on = {ExampleTable}
     sql_template = f"""
         ${{preamble}}
