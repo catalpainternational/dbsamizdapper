@@ -22,7 +22,7 @@ jobs:
     - uses: actions/setup-python@v4
       with:
         python-version: "3.12"
-    - run: uv sync --extra dev --extra testing --extra django
+    - run: uv sync --group dev --group testing --extra django
 
     - name: Lint with flake8
       if: always()
