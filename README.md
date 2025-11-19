@@ -151,4 +151,11 @@ Make this the environment variable `DB_URL`, or add it to the `.env` file
 
 Check out the original readme for rationale and how-to documentation
 
+## Publishing
 
+ - bump the version number in `pyproject.toml`
+ - tag a release on github
+ - `uv build`
+ - `uv publish`
+   - username: __token__
+   - token: (get it from pypi)
