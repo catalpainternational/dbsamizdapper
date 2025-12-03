@@ -8,7 +8,6 @@ from contextlib import suppress
 
 import pytest
 
-from dbsamizdat.exceptions import DatabaseError
 from dbsamizdat.runner import cmd_diff, cmd_nuke, cmd_refresh, cmd_sync, get_cursor
 from dbsamizdat.samizdat import SamizdatMaterializedView, SamizdatView
 
@@ -244,10 +243,8 @@ def test_cmd_refresh_empty_when_no_materialized_views(clean_db):
     cmd_sync(args, [BaseView, DependentView])
 
     # cmd_refresh will discover MaterializedView from code but it doesn't exist in DB
-    # This will raise an error, which is expected behavior
-    # The test verifies that cmd_refresh attempts to refresh discovered matviews
-    with pytest.raises(DatabaseError, match="refresh failed"):
-        cmd_refresh(args)
+    # cmd_refresh now filters to only matviews that exist in DB, so it will do nothing
+    cmd_refresh(args)  # Should complete without error
 
     # Verify no materialized views exist in DB
     with get_cursor(args) as cursor:

@@ -53,6 +53,13 @@ def cmd_refresh(args: ArgType):
             subtree_bundle = subtree_depends(samizdats, rootnodes)
             matviews = [sd for sd in matviews if sd in subtree_bundle]
 
+        # Filter to only materialized views that exist in the database
+        # This prevents errors when code defines matviews that haven't been synced
+        db_matviews = {
+            FQTuple.fqify((s.schemaname, s.viewname)) for s in get_dbstate(cursor) if s.objecttype == "MATVIEW"
+        }
+        matviews = [sd for sd in matviews if sd.fq() in db_matviews]
+
         max_namelen = max(len(str(ds)) for ds in matviews) if len(matviews) else 50
 
         def refreshes():
