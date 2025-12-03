@@ -99,6 +99,14 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "ARG001", # unused function argument (common in protocol implementations)
+    "UP038", # isinstance with tuple (not always compatible with X | Y syntax)
+    "B904",  # raise without from (intentional in some exception handling cases)
+    "ARG002", # unused method args (common with pytest fixtures)
+    "ARG005", # unused lambda args (sometimes needed for API compatibility)
+    "B024",  # abstract base class without abstract methods (protocol pattern)
+    "E402",  # module level import not at top (examples may have comments)
+    "SIM117", # nested with statements (sometimes clearer)
+    "B017",  # pytest.raises(Exception) (acceptable in some test cases)
 ]
 
 [tool.ruff.lint.isort]

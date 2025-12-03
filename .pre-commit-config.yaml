@@ -9,7 +9,18 @@ repos:
     rev: v0.8.4
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [
+          --fix,
+          --exit-non-zero-on-fix,
+          --ignore=UP038,  # isinstance with tuple (not always compatible with X | Y)
+          --ignore=B904,   # raise without from (intentional in some cases)
+          --ignore=ARG002, # unused method args (common with pytest fixtures)
+          --ignore=ARG005, # unused lambda args (sometimes needed for API compatibility)
+          --ignore=B024,   # abstract base class without abstract methods (protocol pattern)
+          --ignore=E402,   # module level import not at top (examples may have comments)
+          --ignore=SIM117, # nested with statements (sometimes clearer)
+          --ignore=B017,   # pytest.raises(Exception) (acceptable in some test cases)
+        ]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
