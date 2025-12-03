@@ -5,6 +5,44 @@ This is based on the original `dbsamizdat` code from https://git.sr.ht/~nullenen
 
 Full disclosure: That one (https://git.sr.ht/~nullenenenen/DBSamizdat/ which is also on pypi) is definitely less likely to have bugs, it was written by a better coder than I am, the original author is "nullenenenen <nullenenenen@gavagai.eu>"
 
+## Quick Start
+
+**For detailed usage examples, see [USAGE.md](USAGE.md)**
+
+### Basic Example
+
+1. Create a module with your database views:
+
+```python
+# myapp/views.py
+from dbsamizdat import SamizdatView
+
+class UserStats(SamizdatView):
+    sql_template = """
+        ${preamble}
+        SELECT COUNT(*) as total_users FROM users
+        ${postamble}
+    """
+```
+
+2. Sync to your database:
+
+```bash
+# Using CLI (modules are automatically imported)
+python -m dbsamizdat.runner sync postgresql:///mydb myapp.views
+
+# Or using library API
+python -c "from dbsamizdat import sync; sync('postgresql:///mydb', samizdatmodules=['myapp.views'])"
+```
+
+### Key Points
+
+- **Module Import**: The CLI automatically imports modules you specify - no need to manually import them first
+- **Database Connection**: Use `DBURL` environment variable or pass connection string directly
+- **Python 3.12+**: Requires Python 3.12 or later
+- **PostgreSQL Only**: Works exclusively with PostgreSQL databases
+- **Dollar-Quoting**: `$$` does not work in SQL functions - use tags like `$BODY$` instead (see [USAGE.md](USAGE.md#dollar-quoting-in-functions-))
+
 ## Installation
 
 ### For Users
@@ -147,9 +185,17 @@ The db url for this container would be:
 
 Make this the environment variable `DB_URL`, or add it to the `.env` file
 
+## Documentation
+
+- **[USAGE.md](USAGE.md)** - Comprehensive usage guide with examples for:
+  - Non-Django projects
+  - Django integration
+  - Library API usage
+  - Common patterns and troubleshooting
+
 ## Original README
 
-Check out the original readme for rationale and how-to documentation
+Check out [README.original.md](README.original.md) for the original rationale and advanced features
 
 ## Publishing
 
