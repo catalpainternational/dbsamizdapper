@@ -186,6 +186,43 @@ dbsamizdapper/
 └── docs/                # Documentation
 ```
 
+## Changelog Maintenance
+
+This project maintains a changelog in `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+
+### When to Update the Changelog
+
+Update `CHANGELOG.md` when making **significant changes** including:
+- New features or functionality
+- Breaking changes to APIs or behavior
+- Bug fixes that affect user experience
+- Security updates
+- Deprecations
+- Performance improvements
+- Documentation improvements that significantly change usage
+
+**Do NOT update for:**
+- Minor refactoring that doesn't change behavior
+- Test-only changes
+- Internal code improvements with no user impact
+- Documentation typo fixes
+
+### How to Update
+
+1. Add entries to the `[Unreleased]` section
+2. Use appropriate categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+3. Use clear, user-focused descriptions
+4. Link to relevant issues/PRs when applicable
+5. When releasing a version, move `[Unreleased]` entries to a new version section
+
+### Example Entry
+
+```markdown
+### Fixed
+- cmd_refresh now filters to only refresh materialized views that exist in the database
+- Fixed GraphViz dot() IndexError when handling empty samizdat lists
+```
+
 ## Contributing
 
 1. Fork the repository
@@ -194,8 +231,9 @@ dbsamizdapper/
 4. Run tests: `uv run pytest`
 5. Run linting: `uv run ruff check . --fix`
 6. Format code: `uv run ruff format .`
-7. Commit using [conventional commits](https://www.conventionalcommits.org/)
-8. Submit a pull request
+7. Update `CHANGELOG.md` if changes are significant (see above)
+8. Commit using [conventional commits](https://www.conventionalcommits.org/)
+9. Submit a pull request
 
 ## Resources
 
