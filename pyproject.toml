@@ -6,6 +6,7 @@ authors = [{name = "Josh Brooks", email = "josh@catalpa.io"}]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pytest-cov>=7.0.0",
     "toposort>=1.10",
 ]
 
@@ -83,3 +84,31 @@ module = [
     "psycopg2"
 ]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["dbsamizdat"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/sample_app/*",
+    "*/examples/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+skip_covered = false
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
