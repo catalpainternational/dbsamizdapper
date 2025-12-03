@@ -114,4 +114,3 @@ Future improvements could include:
 - Better error messages for common mistakes
 - Integration with popular frameworks (FastAPI, Flask, etc.)
 - Support for async database connections
-

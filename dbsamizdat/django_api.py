@@ -37,7 +37,7 @@ def refresh(
 def sync(
     dbconn: str = "default",
     transaction_style: txstyle = txstyle.JUMBO,
-        samizdatmodules=(),
+    samizdatmodules=(),
 ):
     """Sync dbsamizdat state to the DB."""
     args = ArgType(
@@ -52,7 +52,7 @@ def sync(
 def nuke(
     dbconn: str = "default",
     transaction_style: txstyle = txstyle.JUMBO,
-        samizdatmodules=(),
+    samizdatmodules=(),
 ):
     """Remove any database object tagged as samizdat."""
     args = ArgType(

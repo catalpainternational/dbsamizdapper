@@ -46,7 +46,9 @@ def cmd_refresh(args: ArgType):
             allnodes = node_dump(samizdats)
             if rootnodes - allnodes:
                 raise ValueError(
-                    """Unknown rootnodes:\n\t- {}""".format("\n\t- ".join([nodenamefmt(rootnode) for rootnode in rootnodes - allnodes]))
+                    """Unknown rootnodes:\n\t- {}""".format(
+                        "\n\t- ".join([nodenamefmt(rootnode) for rootnode in rootnodes - allnodes])
+                    )
                 )
             subtree_bundle = subtree_depends(samizdats, rootnodes)
             matviews = [sd for sd in matviews if sd in subtree_bundle]

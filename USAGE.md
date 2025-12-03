@@ -31,7 +31,7 @@ class UserStats(SamizdatView):
     """A simple view showing user statistics"""
     sql_template = """
         ${preamble}
-        SELECT 
+        SELECT
             COUNT(*) as total_users,
             COUNT(*) FILTER (WHERE is_active) as active_users
         FROM users
@@ -113,7 +113,7 @@ class UserActivity(SamizdatMaterializedView):
     deps_on_unmanaged = {"orders"}  # Reference to unmanaged table
     sql_template = """
         ${preamble}
-        SELECT 
+        SELECT
             u.id,
             u.username,
             COUNT(o.id) as order_count
@@ -231,7 +231,7 @@ from myapp.models import User, Order
 class UserStats(SamizdatView):
     sql_template = """
         ${preamble}
-        SELECT 
+        SELECT
             COUNT(*) as total_users,
             COUNT(*) FILTER (WHERE is_active) as active_users
         FROM myapp_user
@@ -293,14 +293,14 @@ class UserStatsModel(SamizdatModel):
     """Unmanaged Django model representing a view"""
     total_users = models.IntegerField()
     active_users = models.IntegerField()
-    
+
     class Meta:
         managed = False  # Don't create table, use view instead
         db_table = 'user_stats_view'
-    
+
     sql_template = """
         ${preamble}
-        SELECT 
+        SELECT
             COUNT(*) as total_users,
             COUNT(*) FILTER (WHERE is_active) as active_users
         FROM myapp_user
@@ -469,7 +469,7 @@ python -m dbsamizdat.runner printdot myapp.views | dot -Tpng > graph.png
 
 **Problem**: Materialized views not refreshing
 
-**Solution**: 
+**Solution**:
 - Use `refresh()` command or API
 - Check `refresh_triggers` configuration
 - Verify triggers were created: `\d+ view_name` in psql
@@ -496,6 +496,34 @@ DBSAMIZDAT_MODULES = [
 
 - See `README.md` for installation and development setup
 - See `README.original.md` for original rationale and advanced features
+- See `DEVELOPMENT.md` for development setup and pre-commit usage
 - Check test files in `tests/` for more examples
 - [Pre-commit installation guide with uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/) - Recommended way to install pre-commit for development
 
+## Development Tools
+
+### Pre-commit Hooks
+
+This project uses pre-commit to ensure code quality. After installing pre-commit:
+
+```bash
+# Install pre-commit with uv (recommended)
+uv tool install pre-commit --with pre-commit-uv
+
+# Install Git hooks
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+
+# Run on staged files (default on commit)
+pre-commit run
+```
+
+Pre-commit will automatically:
+- Format code with ruff
+- Check linting with ruff
+- Run type checking with mypy
+- Check for common issues (trailing whitespace, large files, etc.)
+
+See `DEVELOPMENT.md` for complete pre-commit documentation.

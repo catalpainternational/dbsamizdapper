@@ -12,7 +12,7 @@
 
 ### 1. **Add Project Description** (Quick Win)
 
-**Issue**: `pyproject.toml` has empty `description` field  
+**Issue**: `pyproject.toml` has empty `description` field
 **Impact**: Poor discoverability on PyPI, unclear project purpose
 
 **Action**:
@@ -22,7 +22,7 @@ description = "Blissfully naive PostgreSQL database object manager for views, ma
 
 ### 2. **Add CI/CD Pipeline** (High Value)
 
-**Current State**: No automated testing/checks  
+**Current State**: No automated testing/checks
 **Recommendation**: Add GitHub Actions workflow
 
 **Benefits**:
@@ -44,20 +44,20 @@ description = "Blissfully naive PostgreSQL database object manager for views, ma
 
 ### 3. **Improve Integration Test Coverage** (Medium Priority)
 
-**Current State**: Many integration tests require database but aren't run  
+**Current State**: Many integration tests require database but aren't run
 **Coverage Gaps**:
 - `dbsamizdat/runner/commands.py`: 18.48% (needs database)
 - `dbsamizdat/runner/executor.py`: 22.50% (needs database)
 - `dbsamizdat/libdb.py`: 38.46% (needs database)
 
-**Recommendation**: 
+**Recommendation**:
 - Set up GitHub Actions with PostgreSQL service
 - Add docker-compose for local testing
 - Create test database fixtures
 
 ### 4. **Add Pre-commit Hooks** (Developer Experience)
 
-**Current State**: Pre-commit is in dev dependencies but not configured  
+**Current State**: Pre-commit is in dev dependencies but not configured
 **Recommendation**: Add `.pre-commit-config.yaml`
 
 ```yaml
@@ -78,22 +78,22 @@ repos:
 
 ### 5. **Add Type Stubs Export** (Type Safety)
 
-**Current State**: Type hints exist but no `.pyi` stub files  
+**Current State**: Type hints exist but no `.pyi` stub files
 **Recommendation**: Consider generating/publishing type stubs for better IDE support
 
 ## 📚 Documentation Improvements
 
 ### 6. **Add API Reference Documentation**
 
-**Current State**: USAGE.md has examples but no complete API reference  
-**Recommendation**: 
+**Current State**: USAGE.md has examples but no complete API reference
+**Recommendation**:
 - Add docstring examples to all public functions
 - Consider Sphinx/autodoc for API docs
 - Add type hints to docstrings
 
 ### 7. **Add Migration Guide**
 
-**Current State**: No guide for users migrating from original `dbsamizdat`  
+**Current State**: No guide for users migrating from original `dbsamizdat`
 **Recommendation**: Create `MIGRATION.md` with:
 - Breaking changes list
 - Feature differences
@@ -111,48 +111,48 @@ repos:
 
 ### 9. **Fix GraphViz DOT for Tables**
 
-**Current State**: `dot()` function doesn't handle `TABLE` entity type  
-**Issue**: `KeyError: 'TABLE'` when generating graphs with tables  
+**Current State**: `dot()` function doesn't handle `TABLE` entity type
+**Issue**: `KeyError: 'TABLE'` when generating graphs with tables
 **Recommendation**: Add TABLE to styles dict in `graphvizdot.py`
 
 ### 10. **Handle Empty Samizdat Lists in dot()**
 
-**Current State**: `dot([])` raises `IndexError`  
+**Current State**: `dot([])` raises `IndexError`
 **Recommendation**: Add guard clause for empty lists
 
 ### 11. **Improve Error Messages**
 
-**Current State**: Some errors could be more user-friendly  
-**Recommendation**: 
+**Current State**: Some errors could be more user-friendly
+**Recommendation**:
 - Add context to ImportError messages
 - Suggest fixes in error messages
 - Add troubleshooting hints
 
 ### 12. **Add Validation for Module Names**
 
-**Current State**: Invalid module names cause cryptic errors  
+**Current State**: Invalid module names cause cryptic errors
 **Recommendation**: Validate module names before import attempt
 
 ## 🚀 Feature Enhancements
 
 ### 13. **Add Module Discovery Patterns**
 
-**Current State**: Must specify exact module names  
+**Current State**: Must specify exact module names
 **Recommendation**: Support patterns like `myapp.*.views` or `**/dbsamizdat_defs.py`
 
 ### 14. **Add Dry-run Mode to Library API**
 
-**Current State**: Only CLI has dry-run  
+**Current State**: Only CLI has dry-run
 **Recommendation**: Expose `txstyle.DRYRUN` in library API functions
 
 ### 15. **Add Progress Callbacks**
 
-**Current State**: No way to track progress programmatically  
+**Current State**: No way to track progress programmatically
 **Recommendation**: Add optional callback parameter to sync/refresh functions
 
 ### 16. **Support Async Database Connections**
 
-**Current State**: Only synchronous connections  
+**Current State**: Only synchronous connections
 **Recommendation**: Add async support for modern async frameworks
 
 ## 📦 Distribution Improvements
@@ -186,7 +186,7 @@ classifiers = [
 
 ### 19. **Add License File**
 
-**Current State**: LICENSE.txt exists but not referenced  
+**Current State**: LICENSE.txt exists but not referenced
 **Recommendation**: Add `license = {file = "LICENSE.txt"}` to pyproject.toml
 
 ## 🧪 Testing Improvements
@@ -213,8 +213,8 @@ classifiers = [
 
 ### 23. **Add SQL Injection Prevention Documentation**
 
-**Current State**: Uses string templates (potential risk)  
-**Recommendation**: 
+**Current State**: Uses string templates (potential risk)
+**Recommendation**:
 - Document security considerations
 - Add examples of safe vs unsafe patterns
 - Consider parameterized queries where possible
@@ -230,8 +230,8 @@ classifiers = [
 
 ### 25. **Add Structured Logging**
 
-**Current State**: Uses print statements and basic logging  
-**Recommendation**: 
+**Current State**: Uses print statements and basic logging
+**Recommendation**:
 - Use structured logging (JSON format option)
 - Add correlation IDs for tracking operations
 - Log performance metrics
@@ -254,7 +254,7 @@ classifiers = [
 
 ### 28. **Add Makefile for Common Tasks**
 
-**Recommendation**: 
+**Recommendation**:
 ```makefile
 .PHONY: test lint format install dev
 test: uv run pytest
@@ -266,8 +266,8 @@ dev: uv sync --group dev --group testing
 
 ### 29. **Improve Error Recovery**
 
-**Current State**: Some errors leave database in inconsistent state  
-**Recommendation**: 
+**Current State**: Some errors leave database in inconsistent state
+**Recommendation**:
 - Better transaction management
 - Rollback strategies
 - State recovery utilities
@@ -309,4 +309,3 @@ These can be done in < 1 hour each:
 3. ✅ Fix GraphViz TABLE bug
 4. ✅ Add pre-commit config
 5. ✅ Create CONTRIBUTING.md template
-

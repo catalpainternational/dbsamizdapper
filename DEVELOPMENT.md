@@ -59,16 +59,61 @@ We recommend installing pre-commit using [uv](https://adamj.eu/tech/2025/05/07/p
 # Install pre-commit with uv (includes pre-commit-uv for faster Python hook installation)
 uv tool install pre-commit --with pre-commit-uv
 
-# Install Git hooks
+# Install Git hooks (runs automatically on commit)
 pre-commit install
-
-# Run on all files
-pre-commit run --all-files
 ```
 
-**Upgrade pre-commit:**
+**Usage:**
+
 ```bash
+# Run on all files manually
+pre-commit run --all-files
+
+# Run on staged files only (default behavior on commit)
+pre-commit run
+
+# Run a specific hook
+pre-commit run ruff --all-files
+pre-commit run mypy --all-files
+
+# Run only files that have changed
+pre-commit run --files dbsamizdat/api.py
+
+# Update pre-commit hooks to latest versions
+pre-commit autoupdate
+
+# Upgrade pre-commit itself
 uv tool upgrade pre-commit
+
+# Uninstall Git hooks (if needed)
+pre-commit uninstall
+```
+
+**How it works:**
+
+1. When you run `git commit`, pre-commit automatically runs configured hooks
+2. If any hook fails, the commit is blocked
+3. Hooks can auto-fix some issues (e.g., ruff formatting)
+4. After fixes, you need to stage the changes and commit again
+
+**Skipping hooks (not recommended):**
+
+```bash
+# Skip pre-commit hooks for a single commit
+git commit --no-verify -m "your message"
+```
+
+**Troubleshooting:**
+
+```bash
+# Clear pre-commit cache if hooks are misbehaving
+pre-commit clean
+
+# See what hooks would run
+pre-commit run --all-files --verbose
+
+# Test hooks without installing
+pre-commit run --all-files --hook-stage manual
 ```
 
 The pre-commit configuration (`.pre-commit-config.yaml`) includes:
@@ -157,4 +202,3 @@ dbsamizdapper/
 - [Pre-commit installation with uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/) - Recommended installation method
 - [Ruff documentation](https://docs.astral.sh/ruff/)
 - [UV documentation](https://github.com/astral-sh/uv)
-

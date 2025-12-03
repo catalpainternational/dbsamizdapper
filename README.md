@@ -146,7 +146,7 @@ class MyComplexView(SamizdatMaterializedQuerySet):
     ).annotate(
         custom_field=F('field1') + F('field2')
     )
-    
+
     # Optionally specify tables that trigger refresh
     refresh_triggers = [("myapp", "mymodel")]
 ```
@@ -170,15 +170,29 @@ uv run mypy dbsamizdat
 This project uses [pre-commit](https://pre-commit.com/) for automated code quality checks. Install it using [uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/):
 
 ```bash
-# Install pre-commit with uv
+# Install pre-commit with uv (recommended method)
 uv tool install pre-commit --with pre-commit-uv
 
-# Install Git hooks
+# Install Git hooks (runs automatically on commit)
 pre-commit install
 
-# Run on all files
+# Run on all files manually
 pre-commit run --all-files
+
+# Run on staged files only
+pre-commit run
+
+# Run a specific hook
+pre-commit run ruff --all-files
+
+# Update pre-commit hooks to latest versions
+pre-commit autoupdate
+
+# Upgrade pre-commit itself
+uv tool upgrade pre-commit
 ```
+
+**Note:** Pre-commit hooks will automatically run when you commit. To skip hooks (not recommended), use `git commit --no-verify`.
 
 **Build package:**
 ```bash

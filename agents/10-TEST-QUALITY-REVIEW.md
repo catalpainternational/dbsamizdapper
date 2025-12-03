@@ -1,7 +1,7 @@
 # Test Suite Quality Review
 
-**Date:** October 8, 2025  
-**Version:** 0.0.6  
+**Date:** October 8, 2025
+**Version:** 0.0.6
 **Reviewer:** AI Assistant
 
 ---
@@ -197,11 +197,11 @@ def test_cyclic_exception(clean_db):
 def test_load_from_module():
     m = import_module("sample_app.test_samizdats")
     samizdats = list(samizdats_in_module(m))
-    
+
     # ADD ASSERTIONS
     assert len(samizdats) > 0
     assert all(hasattr(s, 'entity_type') for s in samizdats)
-    
+
 def test_load_from_invalid_module():
     with pytest.raises(ModuleNotFoundError):
         import_module("nonexistent_module")
@@ -243,7 +243,7 @@ def test_load_multiple_modules(module_name):
    ```python
    class SimpleTable(SamizdatTable):
        sql_template = """..."""
-   
+
    class TableWithConstraints(SamizdatTable):
        sql_template = """..."""
    ```
@@ -253,7 +253,7 @@ def test_load_multiple_modules(module_name):
    ```python
    cursor.execute(f"""
        SELECT column_name, data_type, is_nullable, column_default
-       FROM information_schema.columns 
+       FROM information_schema.columns
        WHERE table_name = 'SimpleTable'
    """)
    columns = cursor.fetchall()
@@ -282,8 +282,8 @@ def test_load_multiple_modules(module_name):
 3. **Hard-Coded Database URL:**
    ```python
    args = ArgType(
-       txdiscipline="jumbo", 
-       verbosity=3, 
+       txdiscipline="jumbo",
+       verbosity=3,
        dburl=os.environ.get("DBURL", "postgresql://postgres@localhost:5435/postgres")
    )
    ```
@@ -309,7 +309,7 @@ def test_samizdat_table_with_foreign_keys():
             (id SERIAL PRIMARY KEY, name TEXT)
             ${postamble}
         """
-    
+
     class ChildTable(SamizdatTable):
         deps_on = {ParentTable}
         sql_template = f"""
@@ -320,7 +320,7 @@ def test_samizdat_table_with_foreign_keys():
             )
             ${{postamble}}
         """
-    
+
     cmd_sync(args, [ParentTable, ChildTable])
     # Verify FK constraint exists
 
@@ -417,7 +417,7 @@ def test_samizdat_table_unlogged_param(unlogged):
 ```python
 def test_multiple_inheritance():
     """A more complex inheritance example"""
-    
+
     class NowOne(SamizdatMaterializedView): ...
     class NowTwo(SamizdatMaterializedView): ...
     class NowThree(SamizdatMaterializedView): ...
@@ -455,7 +455,7 @@ def test_sidekicks():
     # Creates tables d and d2
     # Uses them
     # Drops them manually at end
-    
+
     with get_cursor(args) as c:
         c.execute("DROP TABLE IF EXISTS d CASCADE;")
         c.execute("DROP TABLE IF EXISTS d2 CASCADE;")
@@ -495,7 +495,7 @@ def test_load_from_module():
 def test_load_from_module():
     m = import_module("sample_app.test_samizdats")
     samizdats = list(samizdats_in_module(m))
-    
+
     assert len(samizdats) > 0, "Should find samizdats in module"
     assert all(hasattr(s, 'entity_type') for s in samizdats)
     assert all(hasattr(s, 'sql_template') for s in samizdats)
@@ -583,10 +583,10 @@ from django.conf import settings
 
 def test_samizdat_queryset_sql_generation():
     """Test QuerySet → SQL conversion"""
-    
+
 def test_samizdat_model_field_extraction():
     """Test model field → view columns"""
-    
+
 def test_django_cursor_integration():
     """Test Django database cursor"""
 ```
@@ -601,10 +601,10 @@ def test_empty_samizdat_list():
 
 def test_very_long_sql():
     """Test with >10KB SQL template"""
-    
+
 def test_unicode_in_names():
     """Test Unicode characters in names"""
-    
+
 def test_reserved_keywords():
     """Test SQL reserved words in names"""
 ```
@@ -912,7 +912,7 @@ def test_all_entities_have_required_methods(entity_class):
 ### 2. Fix failing tests (15 minutes)
 **Impact:** 100% pass rate
 
-### 3. Add test markers (10 minutes)  
+### 3. Add test markers (10 minutes)
 **Impact:** Better organization, faster CI
 
 ### 4. Add assertions to loader tests (15 minutes)
@@ -979,6 +979,5 @@ tests/
 
 ---
 
-**Report generated:** October 8, 2025  
+**Report generated:** October 8, 2025
 **Assessment:** GOOD foundation, needs professional polish
-

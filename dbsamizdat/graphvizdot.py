@@ -49,10 +49,10 @@ def dot(samizdats: Iterable[Samizdat]):
 
     yield "\n".join('"{}" -> "{}"'.format(*e) for e in nice_edges(gen_edges(samizdats)))
     yield "\n".join(
-
-            '"{}" -> "{}" [arrowhead="dot" color="navy" style="dashed" label="🗘" fontname="sans-serif" fontcolor="navy"]'.format(*e)
-            for e in nice_edges(gen_autorefresh_edges(samizdats))
-
+        '"{}" -> "{}" [arrowhead="dot" color="navy" style="dashed" label="🗘" fontname="sans-serif" fontcolor="navy"]'.format(
+            *e
+        )
+        for e in nice_edges(gen_autorefresh_edges(samizdats))
     )
     yield "\n".join('"{}" -> "{}" [color="red"]'.format(*e) for e in nice_edges(gen_unmanaged_edges(samizdats)))
 
