@@ -497,4 +497,5 @@ DBSAMIZDAT_MODULES = [
 - See `README.md` for installation and development setup
 - See `README.original.md` for original rationale and advanced features
 - Check test files in `tests/` for more examples
+- [Pre-commit installation guide with uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/) - Recommended way to install pre-commit for development
 

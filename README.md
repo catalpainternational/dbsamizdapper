@@ -161,10 +161,23 @@ uv run pytest
 
 **Linting and formatting:**
 ```bash
-uv run black .
-uv run isort .
-uv run flake8 .
+uv run ruff check .
+uv run ruff format .
 uv run mypy dbsamizdat
+```
+
+**Pre-commit hooks:**
+This project uses [pre-commit](https://pre-commit.com/) for automated code quality checks. Install it using [uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/):
+
+```bash
+# Install pre-commit with uv
+uv tool install pre-commit --with pre-commit-uv
+
+# Install Git hooks
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
 ```
 
 **Build package:**

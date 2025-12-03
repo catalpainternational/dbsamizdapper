@@ -15,4 +15,4 @@ def nodenamefmt(node) -> str:
 
 
 def sqlfmt(sql: str):
-    return "\n".join(("\t\t" + line for line in sql.splitlines()))
+    return "\n".join("\t\t" + line for line in sql.splitlines())

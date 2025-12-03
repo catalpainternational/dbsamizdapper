@@ -1,7 +1,6 @@
 """Tests for module import functionality in CLI and library API"""
 
 import sys
-from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,6 @@ from dbsamizdat.loader import samizdats_in_module
 from dbsamizdat.runner import ArgType, get_sds
 from dbsamizdat.runner.helpers import import_samizdat_modules
 from dbsamizdat.samizdat import SamizdatView
-
 
 # Create a test module in a temporary location
 TEST_MODULE_DIR = Path(__file__).parent / "test_modules"
@@ -74,18 +72,18 @@ def isolated_module_system(test_module_content):
 def test_import_samizdat_modules_single_module(isolated_module_system, test_module_content):
     """Test that import_samizdat_modules can import a single module"""
     module_name = test_module_content
-    
+
     # Ensure module is not already imported
     assert module_name not in sys.modules
-    
+
     # Import the module
     modules = import_samizdat_modules([module_name])
-    
+
     # Verify module was imported
     assert module_name in sys.modules
     assert len(modules) == 1
     assert modules[0].__name__ == module_name
-    
+
     # Verify samizdats can be found in the module
     samizdats = list(samizdats_in_module(modules[0]))
     assert len(samizdats) == 2
@@ -114,27 +112,27 @@ class TestView3(SamizdatView):
     """
 '''
     )
-    
+
     try:
         module_names = [test_module_content, "test_modules.test_views2"]
-        
+
         # Ensure modules are not already imported
         for name in module_names:
             if name in sys.modules:
                 del sys.modules[name]
-        
+
         # Import the modules
         modules = import_samizdat_modules(module_names)
-        
+
         # Verify both modules were imported
         assert len(modules) == 2
         assert all(m.__name__ in module_names for m in modules)
-        
+
         # Verify samizdats from both modules can be found
         all_samizdats = []
         for module in modules:
             all_samizdats.extend(samizdats_in_module(module))
-        
+
         samizdat_names = {sd.get_name() for sd in all_samizdats}
         assert "TestView1" in samizdat_names
         assert "TestView2" in samizdat_names
@@ -157,22 +155,22 @@ def test_import_samizdat_modules_nonexistent_module():
 def test_get_sds_with_module_names(isolated_module_system, test_module_content):
     """Test that get_sds can discover samizdats from imported modules"""
     module_name = test_module_content
-    
+
     # Ensure module is not already imported
     assert module_name not in sys.modules
-    
+
     # Create args with module names
     args = ArgType(
         samizdatmodules=[module_name],
         in_django=False,
     )
-    
+
     # Get samizdats - should import modules and discover classes
     samizdats = get_sds(args.in_django, samizdatmodules=args.samizdatmodules)
-    
+
     # Verify module was imported
     assert module_name in sys.modules
-    
+
     # Verify samizdats were discovered
     samizdat_names = {sd.get_name() for sd in samizdats}
     assert "TestView1" in samizdat_names
@@ -187,12 +185,12 @@ def test_get_sds_without_modules_uses_autodiscovery():
         samizdatmodules=[],
         in_django=False,
     )
-    
+
     # Import sample_app modules to ensure some samizdats exist
     import sample_app.dbsamizdat_defs  # noqa: F401
-    
+
     samizdats = get_sds(args.in_django, samizdatmodules=args.samizdatmodules)
-    
+
     # Should find samizdats from sample_app
     samizdat_names = {sd.get_name() for sd in samizdats}
     assert len(samizdat_names) > 0
@@ -201,6 +199,7 @@ def test_get_sds_without_modules_uses_autodiscovery():
 @pytest.mark.unit
 def test_get_sds_explicit_list_takes_precedence():
     """Test that explicit samizdat list takes precedence over module names"""
+
     # Create a simple samizdat class inline
     class InlineView(SamizdatView):
         sql_template = """
@@ -208,16 +207,15 @@ def test_get_sds_explicit_list_takes_precedence():
             SELECT 'inline' as source
             ${postamble}
         """
-    
+
     args = ArgType(
         samizdatmodules=["sample_app.dbsamizdat_defs"],
         in_django=False,
     )
-    
+
     # Pass explicit list - should use that instead of importing modules
     samizdats = get_sds(args.in_django, samizdats=[InlineView], samizdatmodules=args.samizdatmodules)
-    
+
     # Should only have the inline view
     samizdat_names = {sd.get_name() for sd in samizdats}
     assert samizdat_names == {"InlineView"}
-

@@ -4,25 +4,24 @@ API for using dbsamizdat as a library in Django
 
 from collections.abc import Iterable
 
-from .runner import ArgType
+from .runner import ArgType, txstyle
 from .runner import cmd_nuke as _cmd_nuke
 from .runner import cmd_refresh as _cmd_refresh
 from .runner import cmd_sync as _cmd_sync
-from .runner import txstyle
 from .samizdat import Samizdat
 
-_CMD_ARG_DEFAULTS = dict(
-    in_django=True,
-    verbosity=1,
-    log_rather_than_print=True,
-)
+_CMD_ARG_DEFAULTS = {
+    "in_django": True,
+    "verbosity": 1,
+    "log_rather_than_print": True,
+}
 
 
 def refresh(
     dbconn: str = "default",
     transaction_style: txstyle = txstyle.JUMBO,
-    belownodes: Iterable[str | tuple | Samizdat] = tuple(),
-    samizdatmodules: tuple = tuple(),
+    belownodes: Iterable[str | tuple | Samizdat] = (),
+    samizdatmodules: tuple = (),
 ):
     """Refresh materialized views, in dependency order, optionally restricted to views depending directly or transitively on any of the DB objects specified in `belownodes`."""  # noqa: E501
     args = ArgType(
@@ -38,7 +37,7 @@ def refresh(
 def sync(
     dbconn: str = "default",
     transaction_style: txstyle = txstyle.JUMBO,
-    samizdatmodules=tuple(),
+        samizdatmodules=(),
 ):
     """Sync dbsamizdat state to the DB."""
     args = ArgType(
@@ -53,7 +52,7 @@ def sync(
 def nuke(
     dbconn: str = "default",
     transaction_style: txstyle = txstyle.JUMBO,
-    samizdatmodules=tuple(),
+        samizdatmodules=(),
 ):
     """Remove any database object tagged as samizdat."""
     args = ArgType(

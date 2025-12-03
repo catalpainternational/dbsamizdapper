@@ -7,11 +7,13 @@ This example shows:
 3. Using the library API programmatically
 """
 
-from dbsamizdat import SamizdatView, SamizdatMaterializedView, SamizdatTable
+from dbsamizdat import SamizdatMaterializedView, SamizdatTable, SamizdatView
+
 
 # Example 1: Simple view
 class CurrentTime(SamizdatView):
     """A simple view showing current time"""
+
     sql_template = """
         ${preamble}
         SELECT NOW() as current_time
@@ -22,6 +24,7 @@ class CurrentTime(SamizdatView):
 # Example 2: Table definition
 class CacheTable(SamizdatTable):
     """Unlogged table for caching"""
+
     unlogged = True
     sql_template = """
         ${preamble}
@@ -37,6 +40,7 @@ class CacheTable(SamizdatTable):
 # Example 3: Materialized view with dependencies
 class CachedTime(SamizdatMaterializedView):
     """Materialized view depending on CurrentTime"""
+
     deps_on = {CurrentTime}
     sql_template = """
         ${preamble}
@@ -48,11 +52,12 @@ class CachedTime(SamizdatMaterializedView):
 # Example 4: View with unmanaged dependency
 class OrdersSummary(SamizdatView):
     """View that depends on an unmanaged table"""
+
     # Reference to a table not managed by dbsamizdat
     deps_on_unmanaged = {"orders"}
     sql_template = """
         ${preamble}
-        SELECT 
+        SELECT
             DATE(created_at) as order_date,
             COUNT(*) as order_count,
             SUM(total) as total_revenue
@@ -65,8 +70,10 @@ class OrdersSummary(SamizdatView):
 # Example 5: Function with dollar-quoting (note: use $BODY$ not $$)
 from dbsamizdat import SamizdatFunction
 
+
 class ExampleFunction(SamizdatFunction):
     """Example function showing correct dollar-quoting syntax"""
+
     sql_template = """
         ${preamble}
         RETURNS TEXT AS
@@ -83,8 +90,7 @@ class ExampleFunction(SamizdatFunction):
 
 if __name__ == "__main__":
     # Example: Using library API
-    from dbsamizdat import sync
-    
+
     # Sync using module name (this file would be imported)
     # In practice, you'd use: sync("postgresql:///mydb", samizdatmodules=["examples.simple_example"])
     print("To sync these samizdats, run:")
@@ -94,4 +100,3 @@ if __name__ == "__main__":
     print("  sync('postgresql:///mydb', samizdatmodules=['examples.simple_example'])")
     print("\nNote: When writing PostgreSQL functions, use $BODY$ instead of $$")
     print("      because $$ clashes with Python's template processing.")
-

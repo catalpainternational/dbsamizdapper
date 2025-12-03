@@ -1,4 +1,4 @@
-from dbsamizdat.samizdat import SamizdatView, SamizdatTable
+from dbsamizdat.samizdat import SamizdatTable, SamizdatView
 
 
 class ExampleTable(SamizdatTable):

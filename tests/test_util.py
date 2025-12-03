@@ -22,7 +22,7 @@ def test_nodenamefmt_with_tuple():
     result = nodenamefmt(("public", "MyView"))
     # For public schema, it omits the schema
     assert result == "MyView"
-    
+
     # For non-public schema, it includes it
     result = nodenamefmt(("analytics", "MyView"))
     assert result == "analytics.MyView"
@@ -33,7 +33,7 @@ def test_nodenamefmt_with_custom_schema():
     """Test nodenamefmt handles custom schemas"""
     result = nodenamefmt(("analytics", "UserStats"))
     assert result == "analytics.UserStats"
-    
+
     # Public schema is omitted
     result = nodenamefmt(("public", "UserStats"))
     assert result == "UserStats"
@@ -57,4 +57,3 @@ def test_nodenamefmt_with_function_signature():
     # Should include schema and function name, possibly signature
     assert "public" in result
     assert "MyFunction" in result
-

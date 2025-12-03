@@ -102,7 +102,7 @@ def test_create_view(clean_db, fruit_pet_tables):
     # Verify database state matches defined state
     with get_cursor(clean_db) as cursor:
         current_state = get_dbstate(cursor)
-        list(dbinfo_to_class(s) for s in current_state)
+        [dbinfo_to_class(s) for s in current_state]
         assert dbstate_equals_definedstate(cursor, samizdats).issame
 
     # Sync again should be idempotent
@@ -117,10 +117,9 @@ def test_create_view(clean_db, fruit_pet_tables):
 
     # After nuke, views should not exist
     cmd_nuke(clean_db)
-    with get_cursor(clean_db) as cursor:
-        with pytest.raises(Exception):
-            cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
-            cursor.fetchall()
+    with get_cursor(clean_db) as cursor, pytest.raises(Exception):
+        cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
+        cursor.fetchall()
 
 
 # ==================== Validation Tests ====================

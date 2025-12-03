@@ -38,9 +38,7 @@ def cmd_refresh(args: ArgType):
         - Uses concurrent refresh when allowed
     """
     with get_cursor(args) as cursor:
-        samizdats = get_sds(
-            args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None) or []
-        )
+        samizdats = get_sds(args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None) or [])
         matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
@@ -48,8 +46,7 @@ def cmd_refresh(args: ArgType):
             allnodes = node_dump(samizdats)
             if rootnodes - allnodes:
                 raise ValueError(
-                    """Unknown rootnodes:\n\t- %s"""
-                    % "\n\t- ".join([nodenamefmt(rootnode) for rootnode in rootnodes - allnodes])
+                    """Unknown rootnodes:\n\t- {}""".format("\n\t- ".join([nodenamefmt(rootnode) for rootnode in rootnodes - allnodes]))
                 )
             subtree_bundle = subtree_depends(samizdats, rootnodes)
             matviews = [sd for sd in matviews if sd in subtree_bundle]

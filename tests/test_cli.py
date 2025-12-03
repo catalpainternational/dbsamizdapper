@@ -1,7 +1,6 @@
 """Tests for CLI argument parsing in dbsamizdat.runner.cli"""
 
 import argparse
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -95,9 +94,7 @@ def test_cli_refresh_with_belownodes():
     parser = argparse.ArgumentParser()
     augment_argument_parser(parser, in_django=False)
 
-    args = parser.parse_args(
-        ["refresh", "postgresql:///test", "module", "--belownodes", "users", "orders"]
-    )
+    args = parser.parse_args(["refresh", "postgresql:///test", "module", "--belownodes", "users", "orders"])
     assert args.belownodes == ["users", "orders"]
 
 
@@ -110,7 +107,7 @@ def test_cli_all_subcommands_exist():
     # Test that subcommands are registered
     # We can't easily test parsing without proper arguments, so just verify structure
     assert hasattr(parser, "_subparsers")
-    
+
     # Test sync command can be parsed with proper args
     args = parser.parse_args(["sync", "postgresql:///test", "module"])
     assert hasattr(args, "func")
@@ -160,4 +157,3 @@ def test_cli_default_values():
     # log_rather_than_print defaults to False when augment_argument_parser is called with default
     # but it's set in the defaults dict, so check what's actually set
     assert hasattr(args, "log_rather_than_print")
-

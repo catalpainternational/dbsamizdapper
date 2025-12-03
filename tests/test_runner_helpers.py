@@ -16,7 +16,7 @@ try:
     from dbsamizdat.runner import ArgType, txstyle  # These stay in main runner for now
     from dbsamizdat.runner.helpers import get_sds, timer, vprint
 except ImportError:
-    from dbsamizdat.runner import vprint, timer, get_sds, ArgType, txstyle
+    from dbsamizdat.runner import ArgType, get_sds, timer, txstyle, vprint
 
 from dbsamizdat.samizdat import SamizdatTable, SamizdatView
 

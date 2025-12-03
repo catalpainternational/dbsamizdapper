@@ -19,7 +19,7 @@ from ..loader import SamizType, autodiscover_samizdats, get_samizdats, samizdats
 from .types import ArgType
 
 logger = getLogger(__name__)
-PRINTKWARGS = dict(file=sys.stderr, flush=True)
+PRINTKWARGS = {"file": sys.stderr, "flush": True}
 
 
 def vprint(args: ArgType, *pargs, **pkwargs):
@@ -83,10 +83,7 @@ def import_samizdat_modules(module_names: list[str]):
     """
     modules = []
     for module_name in module_names:
-        if module_name not in sys.modules:
-            module = import_module(module_name)
-        else:
-            module = sys.modules[module_name]
+        module = import_module(module_name) if module_name not in sys.modules else sys.modules[module_name]
         modules.append(module)
     return modules
 
@@ -127,10 +124,10 @@ def get_sds(
     Example:
         >>> # Using explicit classes
         >>> samizdats = get_sds(samizdats=[MyView, MyTable])
-        
+
         >>> # Using module names
         >>> samizdats = get_sds(samizdatmodules=["myapp.views", "myapp.models"])
-        
+
         >>> # Using autodiscovery (finds all imported subclasses)
         >>> samizdats = get_sds()
     """

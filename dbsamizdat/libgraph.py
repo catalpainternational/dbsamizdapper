@@ -126,14 +126,14 @@ def sanity_check(samizdats: Iterable[SamizType]) -> Iterable[SamizType]:
         # This raises an "UnsuitableNameError" if the
         # "name" is something Postgres might not handle well
         sd.validate_name()
-    sd_fqs = set(sd.fq() for sd in samizdats)
+    sd_fqs = {sd.fq() for sd in samizdats}
     sd_deps = set(chain(*(sd.fqdeps_on() for sd in samizdats)))
     sd_deps_unmanaged = set(chain(*(sd.deps_on_unmanaged for sd in samizdats)))
 
     # are there any classes with ambiguous DB identity?
-    cnt = Counter((sd.db_object_identity() for sd in samizdats))
+    cnt = Counter(sd.db_object_identity() for sd in samizdats)
     if nonunique := [db_id for db_id, count in cnt.items() if count > 1]:
-        raise NameClashError("Non-unique DB entities specified: %s" % nonunique)
+        raise NameClashError(f"Non-unique DB entities specified: {nonunique}")
 
     # check if all declared samizdat deps are present
     if undeclared := sd_deps - sd_fqs:

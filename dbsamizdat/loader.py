@@ -1,8 +1,9 @@
 import inspect
+from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Any, TypeGuard, Iterable
+from typing import Any, TypeGuard
 
 from dbsamizdat.samizdat import (
     Samizdat,

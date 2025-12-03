@@ -35,6 +35,7 @@ WHERE active = true"""
 @pytest.mark.unit
 def test_database_error_formatting():
     """Test DatabaseError formats error message correctly"""
+
     class TestView(SamizdatView):
         sql_template = "${preamble} SELECT 1 ${postamble}"
 
@@ -60,6 +61,7 @@ def test_database_error_with_none_samizdat():
 @pytest.mark.unit
 def test_function_signature_error():
     """Test FunctionSignatureError shows candidate signatures"""
+
     class TestFunc(SamizdatFunction):
         sql_template = "${preamble} RETURNS TEXT AS $BODY$ SELECT 1 $BODY$ LANGUAGE SQL"
         function_arguments_signature = "name text"  # Required attribute
@@ -76,6 +78,7 @@ def test_function_signature_error():
 @pytest.mark.unit
 def test_function_signature_error_empty_candidates():
     """Test FunctionSignatureError handles empty candidate list"""
+
     class TestFunc(SamizdatFunction):
         sql_template = "${preamble} RETURNS TEXT AS $BODY$ SELECT 1 $BODY$ LANGUAGE SQL"
         function_arguments_signature = "name text"  # Required attribute
@@ -99,6 +102,7 @@ def test_samizdat_exception_base_class():
 @pytest.mark.unit
 def test_database_error_inheritance():
     """Test that DatabaseError inherits from SamizdatException"""
+
     class TestView(SamizdatView):
         sql_template = "${preamble} SELECT 1 ${postamble}"
 
@@ -112,6 +116,7 @@ def test_database_error_inheritance():
 @pytest.mark.unit
 def test_function_signature_error_inheritance():
     """Test that FunctionSignatureError inherits from SamizdatException"""
+
     class TestFunc(SamizdatFunction):
         sql_template = "${preamble} RETURNS TEXT AS $BODY$ SELECT 1 $BODY$ LANGUAGE SQL"
 
@@ -119,4 +124,3 @@ def test_function_signature_error_inheritance():
 
     assert isinstance(error, SamizdatException)
     assert isinstance(error, Exception)
-

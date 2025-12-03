@@ -1,7 +1,7 @@
 """Tests for library API functions in dbsamizdat.api"""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -76,10 +76,12 @@ def test_api_functions_use_default_dburl():
         os.environ["DBURL"] = "postgresql:///default"
         # Need to reload the module to pick up new env var
         import importlib
+
         import dbsamizdat.api
+
         importlib.reload(dbsamizdat.api)
         from dbsamizdat.api import sync as reloaded_sync
-        
+
         with patch("dbsamizdat.api._cmd_sync") as mock_sync:
             reloaded_sync()
             args = mock_sync.call_args[0][0]
@@ -91,7 +93,9 @@ def test_api_functions_use_default_dburl():
             del os.environ["DBURL"]
         # Reload module to restore original state
         import importlib
+
         import dbsamizdat.api
+
         importlib.reload(dbsamizdat.api)
 
 
@@ -152,4 +156,3 @@ def test_api_functions_default_verbosity():
         assert args.verbosity == 1
         assert args.log_rather_than_print is True
         assert args.in_django is False
-

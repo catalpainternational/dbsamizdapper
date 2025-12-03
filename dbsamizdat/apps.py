@@ -34,7 +34,7 @@ def get_cmd_args(**kwargs):
         dbconn=DBCONN,
         txdiscipline=txstyle.JUMBO.value,
         in_django=True,
-        samizdatmodules=tuple(),
+        samizdatmodules=(),
         log_rather_than_print=not kwargs.get("interactive"),
     )
 
@@ -82,7 +82,7 @@ def tables_affected_by(apps, plan) -> tuple[bool, set[FQTuple]]:
                     getattr(
                         operation,
                         "model_name",
-                        getattr(operation, "old_name", getattr(operation, "name")),
+                        getattr(operation, "old_name", operation.name),
                     ),
                 )._meta
             except (AttributeError, LookupError):

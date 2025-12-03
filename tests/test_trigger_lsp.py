@@ -275,11 +275,10 @@ def test_trigger_lsp_compliance_after_fix():
     This test shows that after fixing the LSP violation, triggers can be
     used polymorphically with other Samizdat types.
     """
-    from typing import Type
 
     from dbsamizdat.samizdat import Samizdat
 
-    def process_samizdat(samizdat_cls: Type[Samizdat]) -> str:
+    def process_samizdat(samizdat_cls: type[Samizdat]) -> str:
         """
         Function that expects any Samizdat subclass.
         Should work with all Samizdat types per LSP.
