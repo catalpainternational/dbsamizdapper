@@ -33,6 +33,28 @@ class ViewWithError(SamizdatView):
     """
 
 
+class AnotherView(SamizdatView):
+    """Another view for testing multiple operations"""
+
+    sql_template = """
+        ${preamble}
+        SELECT 2 as value
+        ${postamble}
+    """
+
+
+class View1(SamizdatView):
+    """View 1 for jumbo transaction test"""
+
+    sql_template = "${preamble} SELECT 1 ${postamble}"
+
+
+class View2(SamizdatView):
+    """View 2 for jumbo transaction test"""
+
+    sql_template = "${preamble} SELECT 2 ${postamble}"
+
+
 # ==================== Executor Transaction Tests ====================
 
 
@@ -67,22 +89,18 @@ def test_executor_handles_multiple_operations(clean_db):
     # Create multiple views - executor should handle all of them
     cmd_sync(args, [SimpleView])
 
-    # Add another view
-    class AnotherView(SamizdatView):
-        sql_template = """
-            ${preamble}
-            SELECT 2 as value
-            ${postamble}
-        """
-
+    # Add another view (using module-level class)
     cmd_sync(args, [SimpleView, AnotherView])
 
     with get_cursor(args) as cursor:
+        # Verify both views exist
         cursor.execute("""
-            SELECT COUNT(*) FROM pg_views
+            SELECT viewname FROM pg_views
             WHERE schemaname = 'public'
+            AND viewname IN ('SimpleView', 'AnotherView')
         """)
-        assert cursor.fetchone()[0] == 2
+        views = {row[0] for row in cursor.fetchall()}
+        assert views == {"SimpleView", "AnotherView"}
 
 
 @pytest.mark.integration
@@ -112,13 +130,7 @@ def test_executor_jumbo_transaction_all_or_nothing(clean_db):
     args.txdiscipline = "jumbo"
     args.samizdatmodules = []
 
-    # Create multiple views in one transaction
-    class View1(SamizdatView):
-        sql_template = "${preamble} SELECT 1 ${postamble}"
-
-    class View2(SamizdatView):
-        sql_template = "${preamble} SELECT 2 ${postamble}"
-
+    # Create multiple views in one transaction (using module-level classes)
     cmd_sync(args, [View1, View2])
 
     # Both should exist

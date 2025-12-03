@@ -120,7 +120,9 @@ def test_dbstate_equals_definedstate_detects_missing_views(clean_db):
         result = dbstate_equals_definedstate(cursor, [TestView, AnotherTestView])
 
     assert result.issame is False
-    assert AnotherTestView.fq() in result.excess_definedstate
+    # excess_definedstate contains class objects, not FQTuples
+    excess_classes = set(result.excess_definedstate)
+    assert AnotherTestView in excess_classes
 
 
 @pytest.mark.integration
@@ -151,19 +153,21 @@ def test_dbstate_equals_definedstate_ignores_non_dbsamizdat_views(clean_db):
 
     # Create a view manually (not through dbsamizdat)
     with get_cursor(args) as cursor:
+        cursor.execute("DROP VIEW IF EXISTS manual_view CASCADE;")
         cursor.execute("""
             CREATE VIEW manual_view AS SELECT 1;
         """)
 
+        # Verify get_dbstate doesn't return it (no dbsamizdat comment)
+        dbstate = list(get_dbstate(cursor))
+        manual_view_states = [s for s in dbstate if s.schemaname == "public" and s.viewname == "manual_view"]
+        assert len(manual_view_states) == 0  # Should be filtered out
+
         # Check state - should not include manual_view
         result = dbstate_equals_definedstate(cursor, [])
 
-    # Manual view should not be in excess_dbstate (no dbsamizdat comment)
-    # get_dbstate only returns views with dbsamizdat comments, so manual_view won't appear
-    excess_classes = set(result.excess_dbstate)
-    excess_fqs = {cls.fq() for cls in excess_classes}
-    manual_view_fq = FQTuple("public", "manual_view")
-    assert manual_view_fq not in excess_fqs
+    # excess_dbstate should be empty since manual_view has no comment
+    assert len(result.excess_dbstate) == 0
 
 
 # ==================== dbinfo_to_class Tests ====================
