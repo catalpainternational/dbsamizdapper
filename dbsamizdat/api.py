@@ -32,16 +32,29 @@ def refresh(
     dburl: str | None = DEFAULT_URL,
     transaction_style: txstyle = txstyle.JUMBO,
     belownodes: Iterable[str | tuple | Samizdat] = tuple(),
+    samizdatmodules: list[str] | None = None,
 ):
     """
     Refresh materialized views, in dependency order, optionally restricted
     to views depending directly or transitively on any of the DB objects specified
-    in `belownodes`."""
+    in `belownodes`.
+    
+    Args:
+        dburl: PostgreSQL connection string (defaults to DBURL env var)
+        transaction_style: Transaction discipline (default: JUMBO)
+        belownodes: Filter to refresh only views depending on these nodes
+        samizdatmodules: Optional list of module names to import and search for samizdats
+    
+    Example:
+        >>> from dbsamizdat import refresh
+        >>> refresh("postgresql:///mydb", samizdatmodules=["myapp.views"])
+    """
     args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dburl=dburl or DEFAULT_URL,
         txdiscipline=transaction_style.value,
         belownodes=belownodes,
+        samizdatmodules=samizdatmodules or [],
     )
     _cmd_refresh(args)
 
@@ -49,21 +62,50 @@ def refresh(
 def sync(
     dburl: str | None = DEFAULT_URL,
     transaction_style: txstyle = txstyle.JUMBO,
+    samizdatmodules: list[str] | None = None,
 ):
-    """Sync dbsamizdat state to the DB."""
+    """
+    Sync dbsamizdat state to the DB.
+    
+    Args:
+        dburl: PostgreSQL connection string (defaults to DBURL env var)
+        transaction_style: Transaction discipline (default: JUMBO)
+        samizdatmodules: Optional list of module names to import and search for samizdats
+    
+    Example:
+        >>> from dbsamizdat import sync
+        >>> sync("postgresql:///mydb", samizdatmodules=["myapp.views", "myapp.models"])
+    """
     args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dburl=dburl or DEFAULT_URL,
         txdiscipline=transaction_style.value,
+        samizdatmodules=samizdatmodules or [],
     )
     _cmd_sync(args)
 
 
-def nuke(dburl: str | None = DEFAULT_URL, transaction_style: txstyle = txstyle.JUMBO):
-    """Remove any database object tagged as samizdat."""
+def nuke(
+    dburl: str | None = DEFAULT_URL,
+    transaction_style: txstyle = txstyle.JUMBO,
+    samizdatmodules: list[str] | None = None,
+):
+    """
+    Remove any database object tagged as samizdat.
+    
+    Args:
+        dburl: PostgreSQL connection string (defaults to DBURL env var)
+        transaction_style: Transaction discipline (default: JUMBO)
+        samizdatmodules: Optional list of module names to import and search for samizdats
+    
+    Example:
+        >>> from dbsamizdat import nuke
+        >>> nuke("postgresql:///mydb", samizdatmodules=["myapp.views"])
+    """
     args = ArgType(
         **_CMD_ARG_DEFAULTS,
         dburl=dburl or DEFAULT_URL,
         txdiscipline=transaction_style.value,
+        samizdatmodules=samizdatmodules or [],
     )
     _cmd_nuke(args)

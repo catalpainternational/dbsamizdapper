@@ -38,7 +38,9 @@ def cmd_refresh(args: ArgType):
         - Uses concurrent refresh when allowed
     """
     with get_cursor(args) as cursor:
-        samizdats = get_sds(args.in_django)
+        samizdats = get_sds(
+            args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None) or []
+        )
         matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
@@ -79,7 +81,10 @@ def cmd_sync(args: ArgType, samizdatsIn: list[SamizType] | None = None):
         Uses cascade drops so order doesn't matter.
         Re-reads DB state after drops due to cascading effects.
     """
-    samizdats = tuple(get_sds(False, samizdatsIn)) or tuple(get_sds(args.in_django))
+    samizdatmodules = getattr(args, "samizdatmodules", None) or []
+    samizdats = tuple(get_sds(False, samizdatsIn, samizdatmodules)) or tuple(
+        get_sds(args.in_django, samizdatmodules=samizdatmodules)
+    )
 
     with get_cursor(args) as cursor:
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
@@ -143,7 +148,8 @@ def cmd_diff(args: ArgType):
         103: Both have excess objects
     """
     with get_cursor(args) as cursor:
-        samizdats = get_sds(args.in_django)
+        samizdatmodules = getattr(args, "samizdatmodules", None) or []
+        samizdats = get_sds(args.in_django, samizdatmodules=samizdatmodules)
         db_compare = dbstate_equals_definedstate(cursor, samizdats)
         if db_compare.issame:
             vprint(args, "No differences.")
@@ -194,7 +200,8 @@ def cmd_printdot(args: ArgType):
     Example:
         $ dbsamizdat printdot | dot -Tpng > graph.png
     """
-    print("\n".join(dot(get_sds(args.in_django))))
+    samizdatmodules = getattr(args, "samizdatmodules", None) or []
+    print("\n".join(dot(get_sds(args.in_django, samizdatmodules=samizdatmodules))))
 
 
 def cmd_nuke(args: ArgType, samizdats: list[SamizType] | None = None):

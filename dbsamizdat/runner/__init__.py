@@ -26,7 +26,7 @@ from .cli import augment_argument_parser, main
 from .commands import cmd_diff, cmd_nuke, cmd_printdot, cmd_refresh, cmd_sync
 from .context import get_cursor, txi_finalize
 from .executor import executor
-from .helpers import get_sds, timer, vprint
+from .helpers import get_sds, import_samizdat_modules, timer, vprint
 from .types import ACTION, ArgType, txstyle
 
 __all__ = [
@@ -38,6 +38,7 @@ __all__ = [
     "vprint",
     "timer",
     "get_sds",
+    "import_samizdat_modules",
     # Context management
     "get_cursor",
     "txi_finalize",
