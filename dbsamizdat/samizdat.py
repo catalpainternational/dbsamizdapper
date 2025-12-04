@@ -57,12 +57,18 @@ class Samizdat(ProtoSamizdat):
     @classmethod
     def definition_hash(cls):
         """
-        Return the "implanted" hash if preset or generate
-        a new descriptive hash of this instance
-        """
-        if cls.implanted_hash:
-            return cls.implanted_hash
+        Return the "implanted" hash if preset or generate a new descriptive hash.
 
+        Reconstructed classes from the database will have implanted_hash set.
+        For regular classes, computes hash from sql_template and db_object_identity.
+        """
+        implanted = getattr(cls, "implanted_hash", None)
+
+        # Valid implanted_hash must be non-empty and not the string "None"
+        if implanted and implanted not in ("", "None"):
+            return implanted
+
+        # Compute hash from template and identity
         return md5("|".join([cls.get_sql_template(), cls.db_object_identity()]).encode("utf-8")).hexdigest()
 
     @classmethod

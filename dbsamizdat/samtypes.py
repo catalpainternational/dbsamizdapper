@@ -197,10 +197,39 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     def get_sql_template(cls) -> sql_query:
+        """
+        Get the SQL template for this class.
+
+        Handles:
+        - String templates (most common case)
+        - Callable templates (e.g., @classmethod in SamizdatQuerySet)
+        - Missing templates (reconstructed classes from database)
+
+        Raises:
+            AttributeError: If sql_template is missing and this is not a reconstructed class
+        """
+        if not hasattr(cls, "sql_template"):
+            # Reconstructed classes from database don't have sql_template
+            # Check for presence of implanted_hash attribute (even if empty/None)
+            if hasattr(cls, "implanted_hash"):
+                raise AttributeError(
+                    f"Class {cls.__name__} has no 'sql_template' attribute. "
+                    "This is a dynamically reconstructed class from the database. "
+                    "Use 'implanted_hash' instead of calling get_sql_template()."
+                )
+            raise AttributeError(
+                f"Class {cls.__name__} has no 'sql_template' attribute. " "Did you mean: 'get_sql_template'?"
+            )
+
         template: sql_query | Callable[[], sql_query] = cls.sql_template
+
         if isinstance(template, str):
             return template
-        return template()
+
+        if callable(template):
+            return template()
+
+        return template
 
     @classmethod
     def db_object_identity(cls) -> str:
