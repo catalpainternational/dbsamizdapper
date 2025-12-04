@@ -52,6 +52,112 @@ def test_autodiscover(django_setup):
     assert isinstance(result, list)
 
 
+@pytest.mark.django
+def test_autodiscover_includes_dbsamizdat_modules(django_setup):
+    """
+    Test that autodiscover includes modules from DBSAMIZDAT_MODULES setting.
+
+    Requires Django to be configured.
+    """
+    from django.conf import settings
+
+    from dbsamizdat.loader import autodiscover_samizdats
+
+    # Get baseline - samizdats from installed apps
+    original_modules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    try:
+        # Clear DBSAMIZDAT_MODULES to get baseline
+        if hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+        baseline = set(autodiscover_samizdats())
+
+        # Add DBSAMIZDAT_MODULES setting
+        settings.DBSAMIZDAT_MODULES = ["sample_app.test_samizdats"]
+        with_modules = set(autodiscover_samizdats())
+
+        # Should have more samizdats when DBSAMIZDAT_MODULES is set
+        assert len(with_modules) > len(baseline), "DBSAMIZDAT_MODULES should add samizdats"
+
+        # Should include samizdats from test_samizdats module
+        from sample_app.test_samizdats import DealFruitFun, DealFruitView, PetUppercase
+
+        assert DealFruitView in with_modules, "Should include DealFruitView from DBSAMIZDAT_MODULES"
+        assert DealFruitFun in with_modules, "Should include DealFruitFun from DBSAMIZDAT_MODULES"
+        assert PetUppercase in with_modules, "Should include PetUppercase from DBSAMIZDAT_MODULES"
+
+        # Should still include samizdats from installed apps
+        assert AView in with_modules, "Should still include samizdats from installed apps"
+        assert ExampleTable in with_modules, "Should still include samizdats from installed apps"
+    finally:
+        # Restore original setting
+        if original_modules:
+            settings.DBSAMIZDAT_MODULES = original_modules
+        elif hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+
+
+@pytest.mark.django
+def test_autodiscover_multiple_dbsamizdat_modules(django_setup):
+    """
+    Test that autodiscover handles multiple modules in DBSAMIZDAT_MODULES.
+
+    Requires Django to be configured.
+    """
+    from django.conf import settings
+
+    from dbsamizdat.loader import autodiscover_samizdats
+
+    original_modules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    try:
+        # Set multiple modules
+        settings.DBSAMIZDAT_MODULES = [
+            "sample_app.test_samizdats",
+            "sample_app.dbsamizdat_defs",  # This is already autodiscovered, but should work
+        ]
+        result = set(autodiscover_samizdats())
+
+        # Should include samizdats from both modules
+        from sample_app.dbsamizdat_defs import AView
+        from sample_app.test_samizdats import DealFruitView
+
+        assert DealFruitView in result, "Should include samizdats from first module"
+        assert AView in result, "Should include samizdats from second module"
+    finally:
+        # Restore original setting
+        if original_modules:
+            settings.DBSAMIZDAT_MODULES = original_modules
+        elif hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+
+
+@pytest.mark.django
+def test_autodiscover_empty_dbsamizdat_modules(django_setup):
+    """
+    Test that autodiscover works when DBSAMIZDAT_MODULES is empty.
+
+    Requires Django to be configured.
+    """
+    from django.conf import settings
+
+    from dbsamizdat.loader import autodiscover_samizdats
+
+    original_modules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    try:
+        # Set empty list
+        settings.DBSAMIZDAT_MODULES = []
+        result = list(autodiscover_samizdats())
+
+        # Should still work and return samizdats from installed apps
+        assert isinstance(result, list)
+        assert len(result) > 0, "Should still find samizdats from installed apps"
+    finally:
+        # Restore original setting
+        if original_modules:
+            settings.DBSAMIZDAT_MODULES = original_modules
+        elif hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "module_name",
