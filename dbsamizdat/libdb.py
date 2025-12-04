@@ -131,7 +131,7 @@ def get_dbstate(
                 hashattr = "sql_template_hash" if meta["version"] == 0 else "definition_hash"
                 yield item._replace(definition_hash=meta[hashattr])
             except Exception as E:
-                warnings.warn(f"{E}")
+                warnings.warn(f"{E}", stacklevel=2)
                 continue
 
 
@@ -151,24 +151,24 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
     }
 
     entity_type = entitypes[info.objecttype]
-    classfields: dict[str, None | str | tuple[str, str]] = dict(
-        schema=info.schemaname,
-        implanted_hash=str(info.definition_hash),
-    )
+    classfields: dict[str, None | str | tuple[str, str]] = {
+        "schema": info.schemaname,
+        "implanted_hash": str(info.definition_hash),
+    }
     if entity_type == entitypes.FUNCTION:
         classfields.update(
-            dict(
-                function_arguments_signature=str(info.args),
-                function_name=info.viewname,
-            )
+            {
+                "function_arguments_signature": str(info.args),
+                "function_name": info.viewname,
+            }
         )
     elif entity_type == entitypes.TRIGGER:
         table = str(info.args)
         classfields.update(
-            dict(
-                schema=None,
-                on_table=(info.schemaname, table),
-            )
+            {
+                "schema": None,
+                "on_table": (info.schemaname, table),
+            }
         )
     klass: type[Samizdat] = type(info.viewname, (typemap[entitypes[info.objecttype]],), classfields)
     return klass

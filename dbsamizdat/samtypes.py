@@ -111,7 +111,7 @@ class SqlGeneration(ABC):
 
     @classmethod
     @abstractmethod
-    def sign(cls, cursor: "Mogrifier") -> sql_query:
+    def sign(cls, cursor: Mogrifier) -> sql_query:
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
@@ -141,7 +141,7 @@ class HasRefreshTriggers(HasFQ):
     This automatically adds triggers for when a table refreshes to another MatView
     """
 
-    refresh_triggers: set["FQIffable"] = set()
+    refresh_triggers: set[FQIffable] = set()
 
     @classmethod
     def fqrefresh_triggers(cls):
@@ -197,7 +197,7 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     def get_sql_template(cls) -> sql_query:
-        template: sql_query | Callable[[], sql_query] = getattr(cls, "sql_template")
+        template: sql_query | Callable[[], sql_query] = cls.sql_template
         if isinstance(template, str):
             return template
         return template()
@@ -260,7 +260,7 @@ class HasSidekicks(ABC):
 
     @classmethod
     @abstractmethod
-    def sidekicks(cls) -> Iterable["ProtoSamizdat"]: ...
+    def sidekicks(cls) -> Iterable[ProtoSamizdat]: ...
 
 
 class Mogrifier(Protocol):

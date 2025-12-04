@@ -82,7 +82,7 @@ Create one or more modules with classes inheriting from SamizdatView, SamizdatMa
 from dbsamizdat import SamizdatView, SamizdatMaterializedView
 
 class Salutation(SamizdatView):
-    # SQL is written into a template, which will be read as a string.Template to substitute 
+    # SQL is written into a template, which will be read as a string.Template to substitute
     # various values, such as the preamble, which will be substituted with the CREATE statement.
     sql_template = """
       ${preamble}
@@ -148,7 +148,7 @@ commands:
     nuke                Drop all dbsamizdat database objects.
     printdot            Print DB object dependency tree in GraphViz format.
     diff                Show differences between dbsamizdat state and database state. Exits nonzero
-                        if any are found: 101 when there are excess DB-side objects, 102 if there 
+                        if any are found: 101 when there are excess DB-side objects, 102 if there
                         are excess python-side objects, 103 if both sides have excess objects.
     refresh             Refresh materialized views, in dependency order
     sync                Make it so!

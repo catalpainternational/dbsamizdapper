@@ -1,8 +1,9 @@
 import inspect
+from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
 from logging import getLogger
-from typing import Any, TypeGuard, Iterable
+from typing import Any, TypeGuard
 
 from dbsamizdat.samizdat import (
     Samizdat,
@@ -92,9 +93,20 @@ def samizdats_in_app(app_name: str):
 
 def autodiscover_samizdats():
     """
-    Search Django apps for "dbsamizdat_defs" files containing Samizdat models
+    Search Django apps for "dbsamizdat_defs" files containing Samizdat models.
+    Also includes modules specified in DBSAMIZDAT_MODULES setting.
+
+    Yields:
+        SamizType: Samizdat classes found in apps and DBSAMIZDAT_MODULES
     """
     from django.conf import settings
 
+    # First, discover from installed apps
     for app in settings.INSTALLED_APPS:
         yield from samizdats_in_app(app)
+
+    # Then, include modules from DBSAMIZDAT_MODULES setting
+    django_sdmodules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    for sdmod in django_sdmodules:
+        module = import_module(sdmod)
+        yield from samizdats_in_module(module)

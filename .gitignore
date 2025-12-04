@@ -11,3 +11,8 @@ uv.lock
 build/
 *.egg-info/
 .pytest_cache/
+
+# Coverage reports
+coverage.xml
+htmlcov/
+.coverage

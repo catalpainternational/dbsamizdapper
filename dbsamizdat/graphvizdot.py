@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from dbsamizdat.samizdat import Samizdat
 
@@ -25,6 +25,7 @@ def dot(samizdats: Iterable[Samizdat]):
             entitypes.VIEW.name: '"%s" [shape=box fillcolor=grey]',
             entitypes.FUNCTION.name: '"%s" [shape=hexagon fillcolor=olivedrab1]',
             entitypes.TRIGGER.name: '"%s" [shape=cds fillcolor=darkorchid1]',
+            entitypes.TABLE.name: '"%s" [shape=box fillcolor=lightblue]',
         }
         return styles[sd.entity_type.name] % sd
 
@@ -33,7 +34,7 @@ def dot(samizdats: Iterable[Samizdat]):
             yield tuple(map(nodenamefmt, nodepair))
 
     def enquote(thing):
-        return '"%s"' % thing
+        return f'"{thing}"'
 
     unmanaged_fmted = {nodenamefmt(n) for n in unmanaged}
     yield """
@@ -42,24 +43,24 @@ def dot(samizdats: Iterable[Samizdat]):
     node [style="filled" fontname="sans-serif" margin="0.15, 0.15"];
     newrank="true";
     """
-    yield "\n".join(('"%s" [shape=house fillcolor=yellow]' % n for n in unmanaged_fmted))
+    yield "\n".join(f'"{n}" [shape=house fillcolor=yellow]' for n in unmanaged_fmted)
     yield "\n".join(map(nodefmt, samizdats))
     yield "}"
 
-    yield "\n".join(('"%s" -> "%s"' % e for e in nice_edges(gen_edges(samizdats))))
+    yield "\n".join('"{}" -> "{}"'.format(*e) for e in nice_edges(gen_edges(samizdats)))
     yield "\n".join(
-        (
-            '"%s" -> "%s" [arrowhead="dot" color="navy" style="dashed" label="🗘" fontname="sans-serif" fontcolor="navy"]'
-            % e
-            for e in nice_edges(gen_autorefresh_edges(samizdats))
+        '"{}" -> "{}" [arrowhead="dot" color="navy" style="dashed" label="🗘" fontname="sans-serif" fontcolor="navy"]'.format(
+            *e
         )
+        for e in nice_edges(gen_autorefresh_edges(samizdats))
     )
-    yield "\n".join(('"%s" -> "%s" [color="red"]' % e for e in nice_edges(gen_unmanaged_edges(samizdats))))
+    yield "\n".join('"{}" -> "{}" [color="red"]'.format(*e) for e in nice_edges(gen_unmanaged_edges(samizdats)))
 
     if unmanaged:
-        yield "{ rank=min; %s }" % " ".join(map(enquote, unmanaged_fmted))
+        yield "{{ rank=min; {} }}".format(" ".join(map(enquote, unmanaged_fmted)))
         samerank = slice(0, -1)
     for rank in topsorted[samerank]:
-        yield "{ rank=same; %s }" % " ".join(map(enquote, map(nodenamefmt, rank)))
-    yield "{ rank=max; %s }" % " ".join(map(enquote, map(nodenamefmt, topsorted[-1])))
+        yield "{{ rank=same; {} }}".format(" ".join(map(enquote, map(nodenamefmt, rank))))
+    if topsorted:  # Guard against empty list
+        yield "{{ rank=max; {} }}".format(" ".join(map(enquote, map(nodenamefmt, topsorted[-1]))))
     yield "}"

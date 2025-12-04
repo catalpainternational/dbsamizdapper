@@ -56,7 +56,7 @@ def executor(
         if args.verbosity:
             if ix:
                 # print the processing time of the *previous* action
-                vprint(args, "%.2fs" % next(action_timer) if timing else "")
+                vprint(args, f"{next(action_timer):.2f}s" if timing else "")
             vprint(
                 args,
                 f"%-7s %-17s %-{max_namelen}s ..." % (action_totake, sd.entity_type.value, sd),
@@ -91,4 +91,4 @@ def executor(
             cursor.execute("COMMIT;")
 
     if action_cnt:
-        vprint(args, "%.2fs" % next(action_timer) if timing else "")
+        vprint(args, f"{next(action_timer):.2f}s" if timing else "")

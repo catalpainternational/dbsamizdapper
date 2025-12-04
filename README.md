@@ -5,6 +5,44 @@ This is based on the original `dbsamizdat` code from https://git.sr.ht/~nullenen
 
 Full disclosure: That one (https://git.sr.ht/~nullenenenen/DBSamizdat/ which is also on pypi) is definitely less likely to have bugs, it was written by a better coder than I am, the original author is "nullenenenen <nullenenenen@gavagai.eu>"
 
+## Quick Start
+
+**For detailed usage examples, see [USAGE.md](USAGE.md)**
+
+### Basic Example
+
+1. Create a module with your database views:
+
+```python
+# myapp/views.py
+from dbsamizdat import SamizdatView
+
+class UserStats(SamizdatView):
+    sql_template = """
+        ${preamble}
+        SELECT COUNT(*) as total_users FROM users
+        ${postamble}
+    """
+```
+
+2. Sync to your database:
+
+```bash
+# Using CLI (modules are automatically imported)
+python -m dbsamizdat.runner sync postgresql:///mydb myapp.views
+
+# Or using library API
+python -c "from dbsamizdat import sync; sync('postgresql:///mydb', samizdatmodules=['myapp.views'])"
+```
+
+### Key Points
+
+- **Module Import**: The CLI automatically imports modules you specify - no need to manually import them first
+- **Database Connection**: Use `DBURL` environment variable or pass connection string directly
+- **Python 3.12+**: Requires Python 3.12 or later
+- **PostgreSQL Only**: Works exclusively with PostgreSQL databases
+- **Dollar-Quoting**: `$$` does not work in SQL functions - use tags like `$BODY$` instead (see [USAGE.md](USAGE.md#dollar-quoting-in-functions-))
+
 ## Installation
 
 ### For Users
@@ -108,7 +146,7 @@ class MyComplexView(SamizdatMaterializedQuerySet):
     ).annotate(
         custom_field=F('field1') + F('field2')
     )
-    
+
     # Optionally specify tables that trigger refresh
     refresh_triggers = [("myapp", "mymodel")]
 ```
@@ -123,11 +161,38 @@ uv run pytest
 
 **Linting and formatting:**
 ```bash
-uv run black .
-uv run isort .
-uv run flake8 .
+uv run ruff check .
+uv run ruff format .
 uv run mypy dbsamizdat
 ```
+
+**Pre-commit hooks:**
+This project uses [pre-commit](https://pre-commit.com/) for automated code quality checks. Install it using [uv](https://adamj.eu/tech/2025/05/07/pre-commit-install-uv/):
+
+```bash
+# Install pre-commit with uv (recommended method)
+uv tool install pre-commit --with pre-commit-uv
+
+# Install Git hooks (runs automatically on commit)
+pre-commit install
+
+# Run on all files manually
+pre-commit run --all-files
+
+# Run on staged files only
+pre-commit run
+
+# Run a specific hook
+pre-commit run ruff --all-files
+
+# Update pre-commit hooks to latest versions
+pre-commit autoupdate
+
+# Upgrade pre-commit itself
+uv tool upgrade pre-commit
+```
+
+**Note:** Pre-commit hooks will automatically run when you commit. To skip hooks (not recommended), use `git commit --no-verify`.
 
 **Build package:**
 ```bash
@@ -147,9 +212,17 @@ The db url for this container would be:
 
 Make this the environment variable `DB_URL`, or add it to the `.env` file
 
+## Documentation
+
+- **[USAGE.md](USAGE.md)** - Comprehensive usage guide with examples for:
+  - Non-Django projects
+  - Django integration
+  - Library API usage
+  - Common patterns and troubleshooting
+
 ## Original README
 
-Check out the original readme for rationale and how-to documentation
+Check out [README.original.md](README.original.md) for the original rationale and advanced features
 
 ## Publishing
 

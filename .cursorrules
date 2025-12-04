@@ -1,0 +1,64 @@
+# Cursor AI Rules for dbsamizdapper
+
+## Changelog Maintenance
+
+**IMPORTANT**: When making significant changes to the codebase, you MUST update `CHANGELOG.md`.
+
+### When to Update
+
+Update the changelog for:
+- ✅ New features or functionality
+- ✅ Breaking changes to APIs or behavior
+- ✅ Bug fixes that affect user experience
+- ✅ Security updates
+- ✅ Deprecations
+- ✅ Performance improvements
+- ✅ Significant documentation changes
+
+Do NOT update for:
+- ❌ Minor refactoring with no behavior change
+- ❌ Test-only changes
+- ❌ Internal code improvements with no user impact
+- ❌ Documentation typo fixes
+
+### How to Update
+
+1. Add entries to the `[Unreleased]` section in `CHANGELOG.md`
+2. Use appropriate categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+3. Write clear, user-focused descriptions
+4. Follow the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format
+
+### Example
+
+After fixing a bug:
+```markdown
+### Fixed
+- cmd_refresh now filters to only refresh materialized views that exist in the database
+```
+
+After adding a feature:
+```markdown
+### Added
+- Comprehensive integration tests for database operations (30 new tests)
+```
+
+## Code Style
+
+- Use Python 3.12+ features
+- Follow existing code patterns
+- Use ruff for formatting and linting
+- Write tests for new functionality
+- Use conventional commits for commit messages
+
+## Testing
+
+- All new code should have tests
+- Integration tests require a running PostgreSQL database
+- Run `uv run pytest` before committing
+- Maintain test coverage above 55%
+
+## Documentation
+
+- Update docstrings for new functions/classes
+- Update `USAGE.md` if usage patterns change
+- Update `README.md` if installation or setup changes

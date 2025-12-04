@@ -41,6 +41,7 @@ class ArgType(argparse.Namespace):
         log_rather_than_print: Use logging instead of print statements
         dbconn: Django database connection name
         dburl: PostgreSQL connection string
+        samizdatmodules: List of module names containing samizdat classes
     """
 
     txdiscipline: Literal["checkpoint", "jumbo", "dryrun"] | None = "dryrun"
@@ -50,3 +51,4 @@ class ArgType(argparse.Namespace):
     log_rather_than_print: bool = True
     dbconn: str = "default"
     dburl: str | None = os.environ.get("DBURL")
+    samizdatmodules: list[str] = []

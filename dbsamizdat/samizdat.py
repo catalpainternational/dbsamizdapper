@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import contextlib
 import typing
 from collections import Counter
+from collections.abc import Iterable
 from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
-from typing import Any, TypeGuard, Iterable
+from typing import Any, TypeGuard
 
 from dbsamizdat.samtypes import (
+    FQIffable,
     FQTuple,
     HasRefreshTriggers,
     HasSidekicks,
@@ -16,16 +19,13 @@ from dbsamizdat.samtypes import (
     ProtoSamizdat,
     entitypes,
     sql_query,
-    FQIffable,
 )
 
 from .util import nodenamefmt
 
 if typing.TYPE_CHECKING:
-    try:
+    with contextlib.suppress(ModuleNotFoundError, ImportError):
         from django.db.models import Model, QuerySet
-    except (ModuleNotFoundError, ImportError):
-        pass
 
 _DBINFO_VERSION = 1  # Version number for signature format. For future use
 
@@ -79,13 +79,13 @@ class Samizdat(ProtoSamizdat):
         Returns descriptor (json) for this object, to be stored in the database
         """
         return jsondumps(
-            dict(
-                dbsamizdat=dict(
-                    version=_DBINFO_VERSION,
-                    created=int(now()),
-                    definition_hash=cls.definition_hash(),
-                )
-            )
+            {
+                "dbsamizdat": {
+                    "version": _DBINFO_VERSION,
+                    "created": int(now()),
+                    "definition_hash": cls.definition_hash(),
+                }
+            }
         )
 
     @classmethod
@@ -109,11 +109,11 @@ class Samizdat(ProtoSamizdat):
         """
         _AS = "" if cls.entity_type.name == "TABLE" else " AS "
         opts = ["UNLOGGED "] if getattr(cls, "unlogged", False) else []
-        subst = dict(
-            preamble=f"""CREATE {" ".join(opts)}{cls.entity_type.value} {cls.db_object_identity()}{_AS}""",
-            postamble="WITH NO DATA" if sd_is_matview(cls) else "",
-            samizdatname=cls.db_object_identity(),
-        )
+        subst = {
+            "preamble": f"""CREATE {" ".join(opts)}{cls.entity_type.value} {cls.db_object_identity()}{_AS}""",
+            "postamble": "WITH NO DATA" if sd_is_matview(cls) else "",
+            "samizdatname": cls.db_object_identity(),
+        }
         return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
@@ -121,7 +121,9 @@ class Samizdat(ProtoSamizdat):
         """
         SQL to drop object. Cascade because we have no idea about the dependency tree.
         """
-        return f"""DROP {cls.entity_type.value} {"IF EXISTS" if if_exists else ""} {cls.db_object_identity()} CASCADE;"""  # noqa: E501
+        return (
+            f"""DROP {cls.entity_type.value} {"IF EXISTS" if if_exists else ""} {cls.db_object_identity()} CASCADE;"""  # noqa: E501
+        )
 
     @classmethod
     def head_id(cls):
@@ -147,7 +149,7 @@ class SamizdatFunction(Samizdat):
 
     @classmethod
     def get_name(cls) -> str:
-        return getattr(cls, "function_name") or cls.__name__
+        return cls.function_name or cls.__name__
 
     @classmethod
     def fq(cls):
@@ -159,11 +161,7 @@ class SamizdatFunction(Samizdat):
 
     @classmethod
     def creation_identity(cls):
-        return '"%s"."%s"(%s)' % (
-            cls.schema,
-            cls.get_name(),
-            cls.creation_function_arguments(),
-        )
+        return f'"{cls.schema}"."{cls.get_name()}"({cls.creation_function_arguments()})'
 
     @classmethod
     def definition_hash(cls):
@@ -191,10 +189,10 @@ class SamizdatFunction(Samizdat):
 
     @classmethod
     def create(cls):
-        subst = dict(
-            preamble=f"CREATE {cls.entity_type.value} {cls.creation_identity()}",
-            samizdatname=cls.db_object_identity(),
-        )
+        subst = {
+            "preamble": f"CREATE {cls.entity_type.value} {cls.creation_identity()}",
+            "samizdatname": cls.db_object_identity(),
+        }
         return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
@@ -252,10 +250,10 @@ class SamizdatTrigger(Samizdat):
     @classmethod
     def create(cls):
         target_table = FQTuple.fqify(cls.on_table).db_object_identity()
-        subst = dict(
-            preamble=f"""CREATE {cls.entity_type.value} "{cls.get_name()}" {cls.condition} ON {target_table}""",
-            samizdatname=cls.get_name(),
-        )
+        subst = {
+            "preamble": f"""CREATE {cls.entity_type.value} "{cls.get_name()}" {cls.condition} ON {target_table}""",
+            "samizdatname": cls.get_name(),
+        }
         return Template(cls.get_sql_template()).safe_substitute(subst)
 
     @classmethod
@@ -319,21 +317,20 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
             yield type(
                 f"{cls.get_name()}_refresh",
                 (SamizdatFunction,),
-                dict(
-                    schema=cls.schema,
-                    deps_on={cls},
-                    autorefresher=True,
-                    sql_template="""
-                        ${preamble}
+                {
+                    "schema": cls.schema,
+                    "deps_on": {cls},
+                    "autorefresher": True,
+                    "sql_template": f"""
+                        ${{preamble}}
                         RETURNS trigger AS $THEBODY$
                         BEGIN
-                        %s
+                        {cls.refresh()}
                         RETURN NULL;
                         END;
                         $THEBODY$ LANGUAGE plpgsql;
-                    """
-                    % cls.refresh(),
-                ),
+                    """,
+                },
             )
 
     @classmethod
@@ -356,17 +353,16 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
                 yield type(
                     class_name,
                     (SamizdatTrigger,),
-                    dict(
-                        on_table=triggertable,
-                        condition="AFTER UPDATE OR INSERT OR DELETE OR TRUNCATE",
-                        deps_on={triggerfn},
-                        autorefresher=True,
-                        sql_template="""
-                                ${preamble}
-                                FOR EACH STATEMENT EXECUTE PROCEDURE %s;
-                            """
-                        % triggerfn.creation_identity(),
-                    ),
+                    {
+                        "on_table": triggertable,
+                        "condition": "AFTER UPDATE OR INSERT OR DELETE OR TRUNCATE",
+                        "deps_on": {triggerfn},
+                        "autorefresher": True,
+                        "sql_template": f"""
+                                ${{preamble}}
+                                FOR EACH STATEMENT EXECUTE PROCEDURE {triggerfn.creation_identity()};
+                            """,
+                    },
                 )
 
     @classmethod

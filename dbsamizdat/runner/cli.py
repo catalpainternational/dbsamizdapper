@@ -69,13 +69,13 @@ def augment_argument_parser(p: "ArgumentParser", in_django=False, log_rather_tha
         )
 
     p.set_defaults(
-        **dict(
-            func=lambda whatevs: p.print_help(),
-            in_django=in_django,
-            log_rather_than_print=log_rather_than_print,
-            samizdatmodules=[],
-            verbosity=1,
-        )
+        **{
+            "func": lambda whatevs: p.print_help(),
+            "in_django": in_django,
+            "log_rather_than_print": log_rather_than_print,
+            "samizdatmodules": [],
+            "verbosity": 1,
+        }
     )
     if not in_django:
         p.add_argument(

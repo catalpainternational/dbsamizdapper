@@ -16,7 +16,7 @@ try:
     from dbsamizdat.runner import ArgType, txstyle  # These stay in main runner for now
     from dbsamizdat.runner.helpers import get_sds, timer, vprint
 except ImportError:
-    from dbsamizdat.runner import vprint, timer, get_sds, ArgType, txstyle
+    from dbsamizdat.runner import ArgType, get_sds, timer, txstyle, vprint
 
 from dbsamizdat.samizdat import SamizdatTable, SamizdatView
 
@@ -304,3 +304,87 @@ def test_txstyle_enum_members():
     assert txstyle.CHECKPOINT in members
     assert txstyle.JUMBO in members
     assert txstyle.DRYRUN in members
+
+
+# ==================== Django Integration Tests ====================
+
+
+@pytest.mark.django
+def test_get_sds_in_django_includes_dbsamizdat_modules(django_setup):
+    """
+    Test that get_sds with in_django=True includes modules from DBSAMIZDAT_MODULES.
+
+    Requires Django to be configured.
+    """
+    from django.conf import settings  # noqa: PLC0415
+
+    from dbsamizdat.runner.helpers import get_sds
+
+    original_modules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    try:
+        # Get baseline without DBSAMIZDAT_MODULES
+        if hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+        baseline = set(get_sds(in_django=True))
+
+        # Add DBSAMIZDAT_MODULES setting
+        settings.DBSAMIZDAT_MODULES = ["sample_app.test_samizdats"]
+        with_modules = set(get_sds(in_django=True))
+
+        # Should have more samizdats when DBSAMIZDAT_MODULES is set
+        assert len(with_modules) > len(baseline), "DBSAMIZDAT_MODULES should add samizdats"
+
+        # Should include samizdats from test_samizdats module
+        from sample_app.test_samizdats import DealFruitFun, DealFruitView
+
+        assert DealFruitView in with_modules, "Should include DealFruitView from DBSAMIZDAT_MODULES"
+        assert DealFruitFun in with_modules, "Should include DealFruitFun from DBSAMIZDAT_MODULES"
+
+        # Should still include samizdats from installed apps
+        from sample_app.dbsamizdat_defs import AView, ExampleTable
+
+        assert AView in with_modules, "Should still include samizdats from installed apps"
+        assert ExampleTable in with_modules, "Should still include samizdats from installed apps"
+    finally:
+        # Restore original setting
+        if original_modules:
+            settings.DBSAMIZDAT_MODULES = original_modules
+        elif hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
+
+
+@pytest.mark.django
+def test_get_sds_in_django_with_explicit_modules_overrides_dbsamizdat_modules(django_setup):
+    """
+    Test that explicit samizdatmodules parameter overrides DBSAMIZDAT_MODULES.
+
+    Requires Django to be configured.
+    """
+    from django.conf import settings  # noqa: PLC0415
+
+    from dbsamizdat.runner.helpers import get_sds
+
+    original_modules = getattr(settings, "DBSAMIZDAT_MODULES", [])
+    try:
+        # Set DBSAMIZDAT_MODULES
+        settings.DBSAMIZDAT_MODULES = ["sample_app.test_samizdats"]
+
+        # When explicit samizdatmodules is provided, it should override
+        result = set(get_sds(in_django=True, samizdatmodules=["sample_app.dbsamizdat_defs"]))
+
+        # Should only include samizdats from explicit modules, not DBSAMIZDAT_MODULES
+        from sample_app.dbsamizdat_defs import AView, ExampleTable
+        from sample_app.test_samizdats import DealFruitView
+
+        assert AView in result, "Should include samizdats from explicit modules"
+        assert ExampleTable in result, "Should include samizdats from explicit modules"
+        # DBSAMIZDAT_MODULES should be ignored when explicit modules are provided
+        assert (
+            DealFruitView not in result
+        ), "Should not include samizdats from DBSAMIZDAT_MODULES when explicit modules provided"
+    finally:
+        # Restore original setting
+        if original_modules:
+            settings.DBSAMIZDAT_MODULES = original_modules
+        elif hasattr(settings, "DBSAMIZDAT_MODULES"):
+            delattr(settings, "DBSAMIZDAT_MODULES")
