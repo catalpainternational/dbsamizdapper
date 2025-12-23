@@ -28,27 +28,116 @@ class TypeConfusionError(SamizdatException):
     pass
 
 
+def _detect_error_pattern(error_msg: str, sql: str) -> str | None:
+    """
+    Detect common error patterns and provide helpful hints.
+
+    Args:
+        error_msg: The database error message
+        sql: The SQL that was executed
+
+    Returns:
+        A helpful hint string, or None if no pattern matches
+    """
+    error_lower = error_msg.lower()
+    sql_lower = sql.lower()
+
+    # Signature duplication pattern: "syntax error at or near \"(\""
+    if 'syntax error at or near "("' in error_lower or 'syntax error at or near "("' in error_lower:
+        # Check if function signature appears twice
+        if sql_lower.count("create function") > 0 and sql_lower.count("()(") > 0:
+            return (
+                "Signature duplication detected: function_arguments_signature was provided "
+                "but the template also includes a function signature. "
+                "Remove the signature from either the template or the function_arguments_signature attribute."
+            )
+
+    # Missing CREATE FUNCTION pattern
+    if 'syntax error at or near "returns"' in error_lower:
+        if "create function" not in sql_lower and "returns" in sql_lower:
+            return (
+                "Missing CREATE FUNCTION: The template includes RETURNS but no CREATE FUNCTION statement. "
+                "Ensure your template starts with ${preamble} which includes CREATE FUNCTION."
+            )
+
+    # Invalid template variable pattern
+    if 'syntax error at or near "$"' in error_lower or 'syntax error at or near "$"' in error_lower:
+        return (
+            "Invalid template variable: An unsubstituted template variable ($...) was found in the SQL. "
+            "Check that all template variables (${preamble}, ${postamble}, ${samizdatname}) are properly used."
+        )
+
+    return None
+
+
 class DatabaseError(SamizdatException):
-    def __init__(self, message, dberror, samizdat, sql):
+    def __init__(
+        self,
+        message,
+        dberror,
+        samizdat,
+        sql,
+        template: str | None = None,
+        substitutions: dict[str, str] | None = None,
+    ):
         self.message = message
         self.dberror = dberror
         self.samizdat = samizdat
         self.sql = sql
+        self.template = template
+        self.substitutions = substitutions
 
     def __str__(self):
-        return f"""
+        error_msg = str(self.dberror)
+        hint = _detect_error_pattern(error_msg, self.sql)
+
+        # Build context information
+        context_parts = []
+
+        # Show template if available
+        if self.template:
+            context_parts.append(f"Original template:\n{sqlfmt(self.template)}")
+
+        # Show substitutions if available
+        if self.substitutions:
+            sub_lines = "\n".join(f"  ${key} = {value!r}" for key, value in sorted(self.substitutions.items()))
+            context_parts.append(f"Template variable substitutions:\n{sub_lines}")
+
+        # Show function signature if applicable
+        if self.samizdat and hasattr(self.samizdat, "function_arguments_signature"):
+            func_sig = getattr(self.samizdat, "function_arguments_signature", "")
+            if func_sig:
+                context_parts.append(f"function_arguments_signature: {func_sig!r}")
+            else:
+                context_parts.append("function_arguments_signature: '' (empty)")
+
+        context = "\n\n".join(context_parts) if context_parts else None
+
+        # Build error message
+        result = f"""
             While executing:
             {sqlfmt(self.sql)}
 
             a DB error was raised:
-            {self.dberror}
+            {error_msg}
+        """
+
+        if context:
+            result += f"\n\nTemplate processing context:\n{context}"
+
+        if hint:
+            result += f"\n\n💡 Hint: {hint}"
+
+        result += f"""
 
             while we were processing the samizdat:
             {repr(self.samizdat)}
 
             furthermore:
             {self.message}
-            """
+        """
+
+        return result
 
 
 class DependencyCycleError(SamizdatException):
