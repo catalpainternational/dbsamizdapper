@@ -82,6 +82,42 @@ uv sync --group dev --group testing --extra django
 - `django` - Django 4.2 and type stubs for Django integration
 - `psycopg3` - Use psycopg3 instead of psycopg2
 
+## Quick Test Setup
+
+### Integration Tests (Requires Database)
+
+1. **Start PostgreSQL database:**
+   ```bash
+   docker-compose up -d
+   # Or manually:
+   docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+   ```
+
+2. **Set database connection:**
+   ```bash
+   export DB_URL=postgresql://postgres@localhost:5435/postgres
+   # Or create .env file (copy .env.example and adjust if needed)
+   ```
+
+3. **Run all tests:**
+   ```bash
+   uv run pytest
+   ```
+
+### Unit Tests Only (No Database Required)
+
+```bash
+uv run pytest -m unit
+```
+
+### Troubleshooting
+
+- **Connection refused**: Make sure PostgreSQL is running on port 5435
+- **Authentication failed**: Check `DB_URL` format: `postgresql://user@host:port/dbname`
+- **Port in use**: Change port mapping in `docker-compose.yml` or use different port in `DB_URL`
+
+See [TESTING.md](TESTING.md) for detailed testing guide.
+
 ## New features
 
 This fork is based on a rewrite which I did to better understand the internals of `dbsamizdat` as we use it in a few different projects. The changes include:
@@ -201,16 +237,57 @@ uv build
 
 ## Running Tests
 
-Spin up a podman or docker container
+> **Quick Start**: See [Quick Test Setup](#quick-test-setup) above for the fastest way to run tests.
 
-`podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres`
-`docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest`
+### Detailed Setup
 
-The db url for this container would be:
+**Start PostgreSQL database:**
 
-"postgresql:///postgres@localhost:5435/postgres"
+Using docker-compose (recommended):
+```bash
+docker-compose up -d
+```
 
-Make this the environment variable `DB_URL`, or add it to the `.env` file
+Or manually with Docker:
+```bash
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+```
+
+Or with Podman:
+```bash
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+```
+
+**Set database connection:**
+
+The database URL for the container is:
+```
+postgresql://postgres@localhost:5435/postgres
+```
+
+Set it as an environment variable:
+```bash
+export DB_URL=postgresql://postgres@localhost:5435/postgres
+```
+
+Or create a `.env` file in the project root (copy from `.env.example` if available):
+```
+DB_URL=postgresql://postgres@localhost:5435/postgres
+```
+
+The test suite will automatically load `.env` files using `python-dotenv`.
+
+**Run tests:**
+```bash
+# All tests (requires database)
+uv run pytest
+
+# Unit tests only (no database required)
+uv run pytest -m unit
+
+# Integration tests only (requires database)
+uv run pytest -m integration
+```
 
 ## Documentation
 

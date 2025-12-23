@@ -150,20 +150,33 @@ uv build
 
 ## Running Tests
 
-Spin up a podman or docker container for integration tests:
+> **For comprehensive testing guide, see [TESTING.md](TESTING.md)**
 
+### Quick Start
+
+**Start PostgreSQL database:**
 ```bash
-podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres
-# or
-docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest
+docker-compose up -d
+# Or manually:
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
 ```
 
-The db url for this container would be:
-```
-postgresql:///postgres@localhost:5435/postgres
+**Set database connection:**
+```bash
+export DB_URL=postgresql://postgres@localhost:5435/postgres
+# Or create .env file (see .env.example)
 ```
 
-Make this the environment variable `DB_URL`, or add it to the `.env` file.
+**Run tests:**
+```bash
+# All tests (requires database)
+uv run pytest
+
+# Unit tests only (no database required)
+uv run pytest -m unit
+```
+
+See [TESTING.md](TESTING.md) for detailed testing instructions, troubleshooting, and advanced usage.
 
 ## Code Style
 

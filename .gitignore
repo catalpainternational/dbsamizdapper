@@ -16,3 +16,4 @@ build/
 coverage.xml
 htmlcov/
 .coverage
+!.env.example
