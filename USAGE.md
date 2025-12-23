@@ -9,8 +9,9 @@ This guide provides clear examples for using dbsamizdapper in your projects, bot
 3. [Django Integration](#django-integration)
 4. [Library API](#library-api)
 5. [Common Patterns](#common-patterns)
-6. [Template Variables Reference](#template-variables-reference)
-7. [Troubleshooting](#troubleshooting)
+6. [Best Practices and Common Patterns](#best-practices-and-common-patterns)
+7. [Template Variables Reference](#template-variables-reference)
+8. [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
@@ -523,6 +524,256 @@ class MyTrigger(SamizdatTrigger):
 ```
 
 **Important**: When referencing a function in a trigger template, you cannot use template variables. Use Python f-string interpolation with the function class's `creation_identity()` method instead. See [Template Variables Reference](#template-variables-reference) for details.
+
+## Best Practices and Common Patterns
+
+This section provides actionable checklists and common patterns to help you implement functions and triggers correctly without trial-and-error.
+
+### Function Creation Checklist
+
+When creating a `SamizdatFunction`, follow this checklist:
+
+- [ ] **Decide**: Include `CREATE FUNCTION` in template OR use `function_arguments_signature`
+  - **Option A**: Include full `CREATE FUNCTION` statement → Set `function_arguments_signature = ""`
+  - **Option B** (Recommended): Use `${preamble}` → Set `function_arguments_signature` to your parameter signature
+- [ ] **If including in template**: Set `function_arguments_signature = ""`
+- [ ] **Use `${samizdatname}` placeholder** (not hardcoded name) when referencing the function within its own body
+- [ ] **Use `$BODY$` or `$FUNC$` for dollar-quoting** (not `$$`) - PostgreSQL's `$$` conflicts with Python's template processing
+
+### Trigger Creation Checklist
+
+When creating a `SamizdatTrigger`, follow this checklist:
+
+- [ ] **Start template with `${preamble}`** - This provides the `CREATE TRIGGER` statement with proper table reference
+- [ ] **Use `FunctionClass.creation_identity()` for function references** - Use Python f-string interpolation, not template variables
+- [ ] **Include function class in `deps_on` set** - This ensures proper dependency ordering
+- [ ] **Verify `on_table` format** - Can be a string, tuple `(schema, table)`, or Django model class
+
+### Common Patterns
+
+Here are complete, working examples for common use cases:
+
+#### Pattern 1: Simple Function (No Parameters)
+
+```python
+from dbsamizdat import SamizdatFunction
+
+class SimpleFunction(SamizdatFunction):
+    """Function with no parameters"""
+    function_arguments_signature = ""  # No parameters
+    sql_template = """
+        ${preamble}
+        RETURNS TEXT AS
+        $BODY$
+        SELECT 'Hello, World!';
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+**Key points:**
+- `function_arguments_signature = ""` for no parameters
+- Uses `${preamble}` which generates `CREATE FUNCTION "schema"."name"()`
+- Uses `$BODY$` instead of `$$` for dollar-quoting
+
+#### Pattern 2: Function with Parameters
+
+```python
+from dbsamizdat import SamizdatFunction
+
+class GreetFunction(SamizdatFunction):
+    """Function with parameters"""
+    function_arguments_signature = "name TEXT, age INTEGER"
+    sql_template = """
+        ${preamble}
+        RETURNS TEXT AS
+        $BODY$
+        BEGIN
+            RETURN format('Hello %s, you are %s years old', name, age);
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+```
+
+**Key points:**
+- `function_arguments_signature` contains parameter signature without parentheses
+- `${preamble}` automatically includes the signature: `CREATE FUNCTION "schema"."name"(name TEXT, age INTEGER)`
+- Parameters are used directly in the function body
+
+#### Pattern 3: Trigger Calling Function
+
+```python
+from dbsamizdat import SamizdatFunction, SamizdatTrigger, SamizdatTable
+
+class MyTable(SamizdatTable):
+    """Table for trigger example"""
+    sql_template = """
+        ${preamble}
+        (
+            id SERIAL PRIMARY KEY,
+            value TEXT,
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+        ${postamble}
+    """
+
+class UpdateTimestampFunction(SamizdatFunction):
+    """Function that updates timestamp"""
+    function_arguments_signature = ""
+    sql_template = """
+        ${preamble}
+        RETURNS TRIGGER AS
+        $BODY$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+
+class UpdateTimestampTrigger(SamizdatTrigger):
+    """Trigger that calls the update timestamp function"""
+    on_table = MyTable  # Can be class, tuple, or string
+    condition = "BEFORE UPDATE"
+    deps_on = {UpdateTimestampFunction}  # Include function in dependencies
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH ROW EXECUTE FUNCTION {UpdateTimestampFunction.creation_identity()};
+    """
+```
+
+**Key points:**
+- Trigger starts with `${preamble}` (use double braces `{{` in f-strings)
+- Function reference uses `FunctionClass.creation_identity()` with f-string interpolation
+- Function class included in `deps_on` set
+- `on_table` can be a class reference, tuple `("schema", "table")`, or string
+
+#### Pattern 4: Multi-Function Dependencies
+
+```python
+from dbsamizdat import SamizdatFunction, SamizdatTrigger, SamizdatTable
+
+class MyTable(SamizdatTable):
+    """Table for multi-function example"""
+    sql_template = """
+        ${preamble}
+        (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        ${postamble}
+    """
+
+class ValidateNameFunction(SamizdatFunction):
+    """Function to validate name"""
+    function_arguments_signature = "name_value TEXT"
+    sql_template = """
+        ${preamble}
+        RETURNS BOOLEAN AS
+        $BODY$
+        BEGIN
+            RETURN length(name_value) > 0 AND length(name_value) <= 100;
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+
+class LogChangeFunction(SamizdatFunction):
+    """Function to log changes"""
+    function_arguments_signature = ""
+    sql_template = """
+        ${preamble}
+        RETURNS TRIGGER AS
+        $BODY$
+        BEGIN
+            -- Log the change (simplified example)
+            RAISE NOTICE 'Change logged for record %', NEW.id;
+            RETURN NEW;
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+
+class ValidateAndLogTrigger(SamizdatTrigger):
+    """Trigger that uses multiple functions"""
+    on_table = MyTable
+    condition = "BEFORE INSERT OR UPDATE"
+    deps_on = {ValidateNameFunction, LogChangeFunction}  # Multiple function dependencies
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH ROW
+        WHEN ({ValidateNameFunction.creation_identity()}(NEW.name))
+        EXECUTE FUNCTION {LogChangeFunction.creation_identity()};
+    """
+```
+
+**Key points:**
+- Multiple functions can be included in `deps_on` set
+- Each function reference uses its own `creation_identity()` method
+- Functions can be used in trigger conditions (`WHEN` clause) and execution
+- All dependent functions are automatically created before the trigger
+
+### Quick Reference: Common Mistakes to Avoid
+
+❌ **Don't use `$$` for dollar-quoting** - Use `$BODY$` or `$FUNC$` instead
+```python
+# ❌ Wrong
+sql_template = """
+    ${preamble}
+    RETURNS TEXT AS $$
+    SELECT 'test';
+    $$ LANGUAGE SQL;
+"""
+
+# ✅ Correct
+sql_template = """
+    ${preamble}
+    RETURNS TEXT AS $BODY$
+    SELECT 'test';
+    $BODY$ LANGUAGE SQL;
+"""
+```
+
+❌ **Don't hardcode function names** - Use `${samizdatname}` or `creation_identity()`
+```python
+# ❌ Wrong
+sql_template = """
+    ${preamble}
+    RETURNS TEXT AS $BODY$
+    SELECT 'Function: MyFunction';
+    $BODY$ LANGUAGE SQL;
+"""
+
+# ✅ Correct
+sql_template = """
+    ${preamble}
+    RETURNS TEXT AS $BODY$
+    SELECT format('Function: %s', ${samizdatname});
+    $BODY$ LANGUAGE SQL;
+"""
+```
+
+❌ **Don't use template variables for function references in triggers** - Use f-strings with `creation_identity()`
+```python
+# ❌ Wrong
+class MyTrigger(SamizdatTrigger):
+    deps_on = {MyFunction}
+    sql_template = """
+        ${preamble}
+        FOR EACH ROW EXECUTE FUNCTION ${function_ref};  # Template variable doesn't exist!
+    """
+
+# ✅ Correct
+class MyTrigger(SamizdatTrigger):
+    deps_on = {MyFunction}
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH ROW EXECUTE FUNCTION {MyFunction.creation_identity()};
+    """
+```
 
 ## Template Variables Reference
 
