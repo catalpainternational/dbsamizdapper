@@ -75,7 +75,7 @@ uv sync --group dev --group testing --extra django
 ```
 
 **Available dependency groups (development):**
-- `dev` - Development tools (black, isort, flake8, mypy, etc.)
+- `dev` - Development tools (ruff, mypy, etc.)
 - `testing` - Test framework and PostgreSQL testing with psycopg2-binary
 
 **Available extras (optional runtime features):**
