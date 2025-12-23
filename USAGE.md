@@ -9,7 +9,8 @@ This guide provides clear examples for using dbsamizdapper in your projects, bot
 3. [Django Integration](#django-integration)
 4. [Library API](#library-api)
 5. [Common Patterns](#common-patterns)
-6. [Troubleshooting](#troubleshooting)
+6. [Template Variables Reference](#template-variables-reference)
+7. [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
@@ -48,6 +49,8 @@ class UserStatsCached(SamizdatMaterializedView):
         ${postamble}
     """
 ```
+
+> **Note**: For a complete reference of template variables (`${preamble}`, `${postamble}`, `${samizdatname}`) and what they're replaced with, see [Template Variables Reference](#template-variables-reference).
 
 Sync to your database:
 
@@ -394,6 +397,8 @@ class MyFunction(SamizdatFunction):
 
 Omit `CREATE FUNCTION` from your template and use `${preamble}`, which automatically includes `CREATE FUNCTION {schema}.{name}({signature})`. Set `function_arguments_signature` to your parameter signature:
 
+> **See also**: [Template Variables Reference](#template-variables-reference) for complete details on `${preamble}` and other template variables.
+
 ```python
 class MyFunction(SamizdatFunction):
     function_arguments_signature = "name TEXT"  # Parameter signature
@@ -511,13 +516,238 @@ from dbsamizdat import SamizdatTrigger
 
 class MyTrigger(SamizdatTrigger):
     deps_on = {MyFunction}
-    sql_template = """
-        CREATE TRIGGER ${samizdatname}
-        AFTER INSERT ON my_table
-        FOR EACH ROW
-        EXECUTE FUNCTION ${samizdatname}('triggered');
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH ROW EXECUTE FUNCTION {MyFunction.creation_identity()};
     """
 ```
+
+**Important**: When referencing a function in a trigger template, you cannot use template variables. Use Python f-string interpolation with the function class's `creation_identity()` method instead. See [Template Variables Reference](#template-variables-reference) for details.
+
+## Template Variables Reference
+
+Dbsamizdapper uses Python's `string.Template` to process SQL templates. Template variables are replaced with specific SQL strings based on the entity type. This section provides a complete reference of all available template variables and their exact replacements.
+
+### Available Template Variables by Entity Type
+
+#### Views, Tables, and Materialized Views
+
+For `SamizdatView`, `SamizdatTable`, and `SamizdatMaterializedView`:
+
+**`${preamble}`**
+- **Replaced with**: `CREATE [UNLOGGED] VIEW/TABLE/MATERIALIZED VIEW "schema"."name" AS`
+- **Details**:
+  - For views: `CREATE VIEW "schema"."name" AS`
+  - For tables: `CREATE TABLE "schema"."name"` (no `AS` keyword)
+  - For UNLOGGED tables: `CREATE UNLOGGED TABLE "schema"."name"`
+  - For materialized views: `CREATE MATERIALIZED VIEW "schema"."name" AS`
+- **Example**:
+  ```python
+  class MyView(SamizdatView):
+      sql_template = """
+          ${preamble}
+          SELECT 1 as value
+          ${postamble}
+      """
+  # Generates: CREATE VIEW "public"."MyView" AS SELECT 1 as value
+  ```
+
+**`${postamble}`**
+- **Replaced with**: 
+  - For materialized views: `WITH NO DATA`
+  - For views and tables: empty string (removed from output)
+- **Details**: Only materialized views need `WITH NO DATA` to prevent immediate data population
+- **Example**:
+  ```python
+  class MyMatView(SamizdatMaterializedView):
+      sql_template = """
+          ${preamble}
+          AS SELECT 1 as value
+          ${postamble}
+      """
+  # Generates: CREATE MATERIALIZED VIEW "public"."MyMatView" AS SELECT 1 as value WITH NO DATA
+  ```
+
+**`${samizdatname}`**
+- **Replaced with**: `"schema"."name"` (the `db_object_identity()` format)
+- **Details**: Fully qualified database object name, useful for self-references or cross-references
+- **Example**:
+  ```python
+  class MyView(SamizdatView):
+      sql_template = """
+          ${preamble}
+          SELECT * FROM ${samizdatname}
+          ${postamble}
+      """
+  # Generates: CREATE VIEW "public"."MyView" AS SELECT * FROM "public"."MyView"
+  ```
+
+#### Functions
+
+For `SamizdatFunction`:
+
+**`${preamble}`**
+- **Replaced with**: `CREATE FUNCTION "schema"."name"({signature})`
+- **Details**:
+  - Always includes the function signature in parentheses
+  - For functions with no parameters: `"schema"."name"()`
+  - For functions with parameters: `"schema"."name"(param1 TYPE1, param2 TYPE2)`
+  - Uses `creation_identity()` format which includes the signature
+- **Example**:
+  ```python
+  class MyFunction(SamizdatFunction):
+      function_arguments_signature = "name TEXT"
+      sql_template = """
+          ${preamble}
+          RETURNS TEXT AS
+          $BODY$
+          SELECT UPPER(name);
+          $BODY$
+          LANGUAGE SQL;
+      """
+  # Generates: CREATE FUNCTION "public"."MyFunction"(name TEXT) RETURNS TEXT AS ...
+  ```
+
+**`${samizdatname}`**
+- **Replaced with**: `"schema"."name"({signature})` (the `db_object_identity()` format)
+- **Details**: Same as `${preamble}` but without the `CREATE FUNCTION` prefix. Includes signature in parentheses.
+- **Example**:
+  ```python
+  class MyFunction(SamizdatFunction):
+      function_arguments_signature = ""
+      sql_template = """
+          ${preamble}
+          RETURNS TEXT AS
+          $BODY$
+          SELECT 'Function: ${samizdatname}';
+          $BODY$
+          LANGUAGE SQL;
+      """
+  # Inside the function body, ${samizdatname} becomes "public"."MyFunction"()
+  ```
+
+#### Triggers
+
+For `SamizdatTrigger`:
+
+**`${preamble}`**
+- **Replaced with**: `CREATE TRIGGER "trigger_name" {condition} ON "schema"."table_name"`
+- **Details**:
+  - Trigger name is quoted
+  - Includes the trigger condition (e.g., `AFTER INSERT`, `BEFORE UPDATE`)
+  - Includes the target table's fully qualified identity
+  - Does NOT include `FOR EACH ROW` or `EXECUTE FUNCTION` - these must be in your template
+- **Example**:
+  ```python
+  class MyTrigger(SamizdatTrigger):
+      on_table = MyTable
+      condition = "AFTER INSERT"
+      sql_template = """
+          ${preamble}
+          FOR EACH ROW EXECUTE FUNCTION my_function();
+      """
+  # Generates: CREATE TRIGGER "MyTrigger" AFTER INSERT ON "public"."MyTable"
+  #           FOR EACH ROW EXECUTE FUNCTION my_function();
+  ```
+
+**`${samizdatname}`**
+- **Replaced with**: `trigger_name` (just the trigger name, **not** quoted, **not** fully qualified)
+- **Details**: 
+  - Unlike other entity types, this is just the plain trigger name
+  - Useful for self-referencing the trigger name in the template
+  - **Cannot be used to reference functions** - see "Referencing Functions in Triggers" below
+- **Example**:
+  ```python
+  class MyTrigger(SamizdatTrigger):
+      sql_template = """
+          ${preamble}
+          FOR EACH ROW EXECUTE FUNCTION ${samizdatname}();
+      """
+  # ${samizdatname} becomes: MyTrigger
+  # Full SQL: CREATE TRIGGER "MyTrigger" ... FOR EACH ROW EXECUTE FUNCTION MyTrigger();
+  ```
+
+### Referencing Functions in Triggers
+
+**Important**: When you need to reference a function in a trigger template, you **cannot** use template variables. Template variables are only available for the current entity being created.
+
+**❌ Wrong Approach**:
+```python
+class MyTrigger(SamizdatTrigger):
+    deps_on = {MyFunction}
+    sql_template = """
+        ${preamble}
+        FOR EACH ROW EXECUTE FUNCTION ${function_identity}();  # This doesn't exist!
+    """
+```
+
+**✅ Correct Approach**:
+Use Python f-string interpolation with the function class's `creation_identity()` method:
+
+```python
+class MyTrigger(SamizdatTrigger):
+    deps_on = {MyFunction}
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH ROW EXECUTE FUNCTION {MyFunction.creation_identity()};
+    """
+```
+
+**Why this works**:
+- `creation_identity()` returns the full function identity with signature: `"schema"."name"({args})`
+- F-strings evaluate the Python expression at class definition time
+- Use double braces `{{` and `}}` to escape template variables in f-strings
+
+**Complete Example**:
+```python
+class RefreshFunction(SamizdatFunction):
+    function_arguments_signature = ""
+    sql_template = """
+        ${preamble}
+        RETURNS TRIGGER AS
+        $BODY$
+        BEGIN
+            REFRESH MATERIALIZED VIEW my_matview;
+            RETURN NULL;
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+
+class RefreshTrigger(SamizdatTrigger):
+    on_table = MyTable
+    condition = "AFTER INSERT OR UPDATE"
+    deps_on = {RefreshFunction}
+    sql_template = f"""
+        ${{preamble}}
+        FOR EACH STATEMENT EXECUTE FUNCTION {RefreshFunction.creation_identity()};
+    """
+```
+
+### Edge Cases and Notes
+
+**Undefined Variables**: If you use a template variable that doesn't exist (e.g., `${undefined_var}`), Python's `safe_substitute()` will leave it unchanged in the output. This can help catch typos but may also lead to confusing SQL errors.
+
+**Using Template Variables in F-strings**: When using f-strings for your `sql_template`, escape template variables with double braces:
+```python
+class MyView(SamizdatView):
+    sql_template = f"""
+        ${{preamble}}
+        SELECT 1 as value
+        ${{postamble}}
+    """
+```
+
+**Template Variable Summary Table**:
+
+| Entity Type | `${preamble}` | `${postamble}` | `${samizdatname}` |
+|------------|---------------|----------------|-------------------|
+| View | `CREATE VIEW "schema"."name" AS` | (empty) | `"schema"."name"` |
+| Table | `CREATE TABLE "schema"."name"` | (empty) | `"schema"."name"` |
+| UNLOGGED Table | `CREATE UNLOGGED TABLE "schema"."name"` | (empty) | `"schema"."name"` |
+| Materialized View | `CREATE MATERIALIZED VIEW "schema"."name" AS` | `WITH NO DATA` | `"schema"."name"` |
+| Function | `CREATE FUNCTION "schema"."name"({args})` | (N/A) | `"schema"."name"({args})` |
+| Trigger | `CREATE TRIGGER "name" {condition} ON "schema"."table"` | (N/A) | `name` (unquoted) |
 
 ## Troubleshooting
 
@@ -528,6 +758,8 @@ class MyTrigger(SamizdatTrigger):
 **Explanation**: Dbsamizdapper uses Python's `string.Template` to process SQL templates. In Python templates, `$$` is interpreted as an escaped `$` character, which conflicts with PostgreSQL's `$$` dollar-quoting syntax.
 
 **Solution**: Use a tag instead of `$$`. Any tag works (e.g., `$BODY$`, `$FUNC$`, `$CODE$`):
+
+> **See also**: [Template Variables Reference](#template-variables-reference) for information about how template variables are processed.
 
 ```python
 # ❌ This will NOT work
