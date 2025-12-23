@@ -129,3 +129,10 @@ def sync(dburl: str, samizdatmodules: list[str]) -> None:
 - Update docstrings for new functions/classes
 - Update `USAGE.md` if usage patterns change
 - Update `README.md` if installation or setup changes
+
+## Error Handling and Clarity
+
+- When encountering unexpected errors (e.g., `ModuleNotFoundError`, import errors, missing dependencies), investigate and improve project clarity
+- Add documentation or fix configuration issues that cause confusion
+- Update relevant documentation files (README.md, TESTING.md, DEVELOPMENT.md) to prevent similar issues
+- For test-related errors, ensure instructions clearly state prerequisites (e.g., database setup, using `uv run pytest`)

@@ -203,8 +203,11 @@ class MyComplexView(SamizdatMaterializedQuerySet):
 
 **Run tests:**
 ```bash
+# Ensure database is ready first (see TESTING.md for setup)
 uv run pytest
 ```
+
+**Note**: Always use `uv run pytest` (not `pytest` or `python -m pytest`) to ensure dependencies are available in the virtual environment.
 
 **Linting and formatting:**
 ```bash
