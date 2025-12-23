@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enhanced error messages for SQL template processing failures (Issue #9)
+  - Error messages now show original template, template variable substitutions, and function signature context
+  - Automatic detection of common error patterns with helpful hints:
+    - Signature duplication detection
+    - Missing CREATE FUNCTION detection
+    - Invalid template variable detection
+  - Comprehensive troubleshooting documentation in USAGE.md with debugging tips
 - Comprehensive integration tests for database operations (30 new tests covering cmd_sync, cmd_refresh, cmd_nuke, cmd_diff, executor, and libdb)
 - Unit tests for module import functionality (`tests/test_module_import.py`)
 - Unit tests for CLI argument parsing and command execution (`tests/test_cli.py`)

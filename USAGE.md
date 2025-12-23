@@ -891,6 +891,172 @@ class BadFunction(SamizdatFunction):
     """
 ```
 
+### SQL Template Processing Errors
+
+When SQL generation fails, dbsamizdapper now provides enhanced error messages to help debug template issues.
+
+#### Understanding Error Messages
+
+Enhanced error messages include:
+- **Original template**: The SQL template before variable substitution
+- **Template variable substitutions**: What values replaced `${preamble}`, `${postamble}`, `${samizdatname}`
+- **Function signature**: The `function_arguments_signature` used (for functions)
+- **Final SQL**: The SQL that was attempted (always shown)
+- **Error hints**: Automatic detection of common error patterns
+
+#### Common Error Patterns
+
+**1. Signature Duplication**
+
+**Error**: `syntax error at or near "("`
+
+**Problem**: Function signature appears twice in the generated SQL, like:
+```sql
+CREATE FUNCTION "name"()(target_ts TIMESTAMP WITH TIME ZONE)
+```
+
+**Cause**: Both `function_arguments_signature` attribute and the template include a signature.
+
+**Solution**: Remove the signature from either:
+- The `function_arguments_signature` attribute (if template has it), OR
+- The template (if `function_arguments_signature` is set)
+
+**Example**:
+```python
+# ❌ Problem: signature in both places
+class BadFunction(SamizdatFunction):
+    function_arguments_signature = "target_ts TIMESTAMP WITH TIME ZONE"
+    sql_template = """
+        ${preamble}
+        (target_ts TIMESTAMP WITH TIME ZONE)  # ← Remove this
+        RETURNS TIMESTAMP AS $BODY$
+        SELECT target_ts;
+        $BODY$ LANGUAGE SQL;
+    """
+
+# ✅ Solution 1: Remove from template
+class GoodFunction1(SamizdatFunction):
+    function_arguments_signature = "target_ts TIMESTAMP WITH TIME ZONE"
+    sql_template = """
+        ${preamble}
+        RETURNS TIMESTAMP AS $BODY$
+        SELECT target_ts;
+        $BODY$ LANGUAGE SQL;
+    """
+
+# ✅ Solution 2: Remove from attribute
+class GoodFunction2(SamizdatFunction):
+    function_arguments_signature = ""  # ← Empty, template has it
+    sql_template = """
+        ${preamble}
+        (target_ts TIMESTAMP WITH TIME ZONE)
+        RETURNS TIMESTAMP AS $BODY$
+        SELECT target_ts;
+        $BODY$ LANGUAGE SQL;
+    """
+```
+
+**2. Missing CREATE FUNCTION**
+
+**Error**: `syntax error at or near "RETURNS"`
+
+**Problem**: Template includes `RETURNS` but no `CREATE FUNCTION` statement.
+
+**Cause**: Template doesn't start with `${preamble}` or `${preamble}` wasn't substituted properly.
+
+**Solution**: Ensure your template starts with `${preamble}`:
+
+```python
+# ❌ Missing CREATE FUNCTION
+class BadFunction(SamizdatFunction):
+    sql_template = """
+        RETURNS TEXT AS $BODY$
+        SELECT 'test';
+        $BODY$ LANGUAGE SQL;
+    """
+
+# ✅ Correct: Use ${preamble}
+class GoodFunction(SamizdatFunction):
+    sql_template = """
+        ${preamble}
+        RETURNS TEXT AS $BODY$
+        SELECT 'test';
+        $BODY$ LANGUAGE SQL;
+    """
+```
+
+**3. Invalid Template Variable**
+
+**Error**: `syntax error at or near "$"`
+
+**Problem**: Unsubstituted template variable found in SQL.
+
+**Cause**: Template variable not recognized or typo in variable name.
+
+**Solution**: Use only recognized variables:
+- `${preamble}` - CREATE statement prefix
+- `${postamble}` - WITH NO DATA suffix (for materialized views)
+- `${samizdatname}` - Fully qualified object name
+
+```python
+# ❌ Invalid variable
+class BadView(SamizdatView):
+    sql_template = """
+        ${preamble} SELECT $invalid FROM users ${postamble}
+    """
+
+# ✅ Use valid variables
+class GoodView(SamizdatView):
+    sql_template = """
+        ${preamble} SELECT * FROM users ${postamble}
+    """
+```
+
+#### Debugging Tips
+
+**1. Enable Verbose Output**
+
+Use `-v` flag to see the SQL being executed:
+
+```bash
+python -m dbsamizdat.runner sync postgresql:///mydb myapp.views -v
+```
+
+**2. Inspect Generated SQL**
+
+When an error occurs, the error message shows:
+- The original template
+- What substitutions were made
+- The final SQL that failed
+
+**3. Test Templates in Isolation**
+
+You can test template processing without executing:
+
+```python
+from dbsamizdat import SamizdatView
+
+class TestView(SamizdatView):
+    sql_template = "${preamble} SELECT 1 ${postamble}"
+
+# See what SQL would be generated
+print(TestView.create())
+# Output: CREATE VIEW "public"."TestView" AS  SELECT 1
+```
+
+**4. Check Function Signatures**
+
+For functions, verify `function_arguments_signature` matches what's in the database:
+
+```python
+# Check what signature PostgreSQL expects
+# The error message will show candidate signatures if there's a mismatch
+```
+
+**5. Review Error Context**
+
+Enhanced error messages automatically detect common patterns and provide hints. Look for the 💡 Hint section in error output.
+
 ### Module Not Found Errors
 
 **Problem**: `ModuleNotFoundError: No module named 'myapp.views'`

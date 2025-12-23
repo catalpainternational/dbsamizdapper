@@ -83,7 +83,53 @@ def executor(
                     raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
         except Exception as dberr:
-            raise DatabaseError(f"{action_totake} failed", dberr, sd, sql)
+            # Capture template context for better error messages
+            template = None
+            substitutions = None
+
+            if action_totake == "create" and hasattr(sd, "get_sql_template"):
+                try:
+                    template = sd.get_sql_template()
+                    # Extract substitutions that were used
+                    if hasattr(sd, "entity_type"):
+                        from ..samizdat import sd_is_function, sd_is_matview, sd_is_trigger
+
+                        substitutions = {}
+                        if sd_is_function(sd):
+                            substitutions = {
+                                "preamble": f"CREATE {sd.entity_type.value} {sd.creation_identity()}",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                        elif sd_is_trigger(sd):
+                            from ..samtypes import FQTuple
+
+                            target_table = FQTuple.fqify(sd.on_table).db_object_identity()
+                            substitutions = {
+                                "preamble": f"""CREATE {sd.entity_type.value} "{sd.get_name()}" {sd.condition} ON {target_table}""",
+                                "samizdatname": sd.get_name(),
+                            }
+                        elif sd_is_matview(sd):
+                            _AS = " AS "
+                            opts = ["UNLOGGED "] if getattr(sd, "unlogged", False) else []
+                            substitutions = {
+                                "preamble": f"""CREATE {" ".join(opts)}{sd.entity_type.value} {sd.db_object_identity()}{_AS}""",
+                                "postamble": "WITH NO DATA",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                        else:
+                            # For views and tables
+                            _AS = "" if sd.entity_type.name == "TABLE" else " AS "
+                            opts = ["UNLOGGED "] if getattr(sd, "unlogged", False) else []
+                            substitutions = {
+                                "preamble": f"""CREATE {" ".join(opts)}{sd.entity_type.value} {sd.db_object_identity()}{_AS}""",
+                                "postamble": "",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                except Exception:
+                    # If we can't get template info, continue without it
+                    pass
+
+            raise DatabaseError(f"{action_totake} failed", dberr, sd, sql, template, substitutions)
         cursor.execute(f"RELEASE SAVEPOINT action_{action_totake};")
         if args.txdiscipline == txstyle.CHECKPOINT.value and action_totake != "create":
             # only commit *after* signing, otherwise if later the signing somehow fails
