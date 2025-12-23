@@ -75,7 +75,7 @@ uv sync --group dev --group testing --extra django
 ```
 
 **Available dependency groups (development):**
-- `dev` - Development tools (black, isort, flake8, mypy, etc.)
+- `dev` - Development tools (ruff, mypy, etc.)
 - `testing` - Test framework and PostgreSQL testing with psycopg2-binary
 
 **Available extras (optional runtime features):**
@@ -88,14 +88,25 @@ uv sync --group dev --group testing --extra django
 
 1. **Start PostgreSQL database:**
    ```bash
-   docker-compose up -d
-   # Or manually:
+   # Prefer podman if available (for parallel branch testing)
+   # Default PostgreSQL version 15
+   podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+   # Or with docker:
    docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+   # Or with docker compose (defaults to PostgreSQL 15):
+   docker compose up -d
+   # Or: docker-compose up -d
+   # Or with docker compose using different version:
+   POSTGRES_VERSION=16 docker compose up -d
+   # Or: POSTGRES_VERSION=16 docker-compose up -d
    ```
 
 2. **Set database connection:**
    ```bash
-   export DB_URL=postgresql://postgres@localhost:5435/postgres
+   # Recommended: Use DB_PORT for easy port switching (useful for parallel branches)
+   export DB_PORT=5435
+   # Or use full connection string:
+   # export DB_URL=postgresql://postgres@localhost:5435/postgres
    # Or create .env file (copy .env.example and adjust if needed)
    ```
 
@@ -114,7 +125,7 @@ uv run pytest -m unit
 
 - **Connection refused**: Make sure PostgreSQL is running on port 5435
 - **Authentication failed**: Check `DB_URL` format: `postgresql://user@host:port/dbname`
-- **Port in use**: Change port mapping in `docker-compose.yml` or use different port in `DB_URL`
+- **Port in use**: Change port mapping in `docker-compose.yml` or use different port in `DB_URL` or set `DB_PORT`
 
 See [TESTING.md](TESTING.md) for detailed testing guide.
 
@@ -243,39 +254,58 @@ uv build
 
 **Start PostgreSQL database:**
 
-Using docker-compose (recommended):
+Prefer podman if available (useful for parallel branch testing):
 ```bash
-docker-compose up -d
-```
-
-Or manually with Docker:
-```bash
-docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
-```
-
-Or with Podman:
-```bash
+# Default PostgreSQL version 15
 podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+# Or use version 16
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:16
+```
+
+Or with Docker:
+```bash
+# Default PostgreSQL version 15
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+# Or use version 16
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16
+```
+
+Or with docker compose:
+```bash
+# Default PostgreSQL version 15
+docker compose up -d
+# Or: docker-compose up -d
+# Or use version 16
+POSTGRES_VERSION=16 docker compose up -d
+# Or: POSTGRES_VERSION=16 docker-compose up -d
 ```
 
 **Set database connection:**
 
-The database URL for the container is:
-```
-postgresql://postgres@localhost:5435/postgres
+**Option 1: Using DB_PORT (Recommended for parallel branches)**
+```bash
+export DB_PORT=5435
 ```
 
-Set it as an environment variable:
+**Option 2: Using full connection string**
 ```bash
 export DB_URL=postgresql://postgres@localhost:5435/postgres
 ```
 
-Or create a `.env` file in the project root (copy from `.env.example` if available):
+**Option 3: Create `.env` file**
+Create a `.env` file in the project root (copy from `.env.example` if available):
 ```
-DB_URL=postgresql://postgres@localhost:5435/postgres
+DB_PORT=5435
+POSTGRES_VERSION=15
+# Or: DB_URL=postgresql://postgres@localhost:5435/postgres
 ```
 
 The test suite will automatically load `.env` files using `python-dotenv`.
+
+**Note**: 
+- For parallel branch testing, use different ports (e.g., 5435, 5436, 5437) and set `DB_PORT` accordingly.
+- PostgreSQL version defaults to 15. Set `POSTGRES_VERSION` to use a different version (for `docker compose` or `docker-compose`) or specify the version in the image tag (for podman/docker).
+- Docker Compose: Use `docker compose` (Docker Compose v2, built into Docker) or `docker-compose` (standalone). Both work with the same `docker-compose.yml` file.
 
 **Run tests:**
 ```bash
