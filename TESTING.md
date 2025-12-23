@@ -23,39 +23,125 @@ For the fastest way to get tests running, see the [Quick Test Setup](#quick-test
 
 ### 1. Start PostgreSQL Database
 
-**Option A: Using Docker Compose (Recommended)**
+**Option A: Using Podman (Preferred)**
+
+Podman is preferred if available. Use different ports for different branches to allow parallel testing:
+
 ```bash
-docker-compose up -d
+# Default port (5435) and PostgreSQL version 15 (default)
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+
+# Different port for parallel branches (e.g., feature branch)
+podman run -d -p 5436:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+
+# Using different PostgreSQL version (e.g., version 16)
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:16
 ```
 
 **Option B: Using Docker**
+
 ```bash
+# Default port and PostgreSQL version 15 (default)
 docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+
+# Different port for parallel branches
+docker run -d -p 5436:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15
+
+# Using different PostgreSQL version (e.g., version 16)
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16
 ```
 
-**Option C: Using Podman**
+**Option C: Using Docker Compose**
+
 ```bash
-podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+# Default PostgreSQL version 15
+# Use 'docker compose' (Docker Compose v2) or 'docker-compose' (standalone)
+docker compose up -d
+# Or: docker-compose up -d
+
+# Using different PostgreSQL version (e.g., version 16)
+POSTGRES_VERSION=16 docker compose up -d
+# Or: POSTGRES_VERSION=16 docker-compose up -d
 ```
+
+**Note**: 
+- For parallel branch testing, use different ports (e.g., 5435, 5436, 5437) and configure `DB_PORT` accordingly.
+- PostgreSQL version defaults to 15. Set `POSTGRES_VERSION` environment variable to use a different version (e.g., `POSTGRES_VERSION=16`).
+- Docker Compose: Use `docker compose` (Docker Compose v2, built into Docker) or `docker-compose` (standalone). Both work with the same `docker-compose.yml` file.
 
 ### 2. Set Database Connection
 
-**Option A: Environment Variable**
+**Option A: Using DB_PORT (Recommended for parallel branches)**
+
+Set the port number as an environment variable:
+```bash
+export DB_PORT=5435
+```
+
+The test suite will automatically construct the connection string: `postgresql://postgres@localhost:5435/postgres`
+
+**Option B: Using Full DB_URL**
+
+Set the complete connection string:
 ```bash
 export DB_URL=postgresql://postgres@localhost:5435/postgres
 ```
 
-**Option B: Create `.env` File**
+**Option C: Create `.env` File**
 
 Create a `.env` file in the project root:
 ```bash
-# Copy this content to .env file
-DB_URL=postgresql://postgres@localhost:5435/postgres
+# Using port number (preferred for parallel branches)
+DB_PORT=5435
+
+# Or using full connection string
+# DB_URL=postgresql://postgres@localhost:5435/postgres
 ```
 
 The test suite automatically loads `.env` files using `python-dotenv`.
 
 **Note**: A `.env.example` file should exist in the repository as a template. If it doesn't, create `.env` with the content above.
+
+### Parallel Branch Testing
+
+To run tests on different branches simultaneously, use different ports:
+
+```bash
+# Branch 1 (main) - PostgreSQL 15 (default)
+export DB_PORT=5435
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+
+# Branch 2 (feature-branch) - PostgreSQL 15 (default)
+export DB_PORT=5436
+podman run -d -p 5436:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+
+# Branch 3 (testing PostgreSQL 16)
+export DB_PORT=5437
+podman run -d -p 5437:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:16
+```
+
+### PostgreSQL Version Configuration
+
+The PostgreSQL version defaults to **15**. You can configure it using:
+
+**For Docker Compose:**
+```bash
+# Docker Compose v2 (built into Docker)
+POSTGRES_VERSION=16 docker compose up -d
+# Or standalone docker-compose
+POSTGRES_VERSION=16 docker-compose up -d
+```
+
+**For Podman/Docker:**
+```bash
+# Use version 16
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:16
+
+# Use version 14
+docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:14
+```
+
+**Available PostgreSQL versions:** 12, 13, 14, 15, 16 (check [Docker Hub](https://hub.docker.com/_/postgres) for latest versions)
 
 ### 3. Run Tests
 
@@ -133,18 +219,24 @@ This matches the default Docker Compose configuration.
 
 ### Changing the Port
 
-If port 5435 is already in use:
+For parallel branch testing or when port 5435 is already in use:
 
-1. **Update `docker-compose.yml`:**
-   ```yaml
-   ports:
-     - "5436:5432"  # Change 5435 to 5436
-   ```
+**Option 1: Using DB_PORT (Recommended)**
+```bash
+export DB_PORT=5436
+```
 
-2. **Update `DB_URL`:**
-   ```bash
-   export DB_URL=postgresql://postgres@localhost:5436/postgres
-   ```
+**Option 2: Using DB_URL**
+```bash
+export DB_URL=postgresql://postgres@localhost:5436/postgres
+```
+
+**Option 3: Update `docker-compose.yml`**
+```yaml
+ports:
+  - "5436:5432"  # Change 5435 to 5436
+```
+Then set `DB_PORT=5436` or update `DB_URL` accordingly.
 
 ---
 
@@ -215,9 +307,21 @@ uv run pytest -n auto  # Use all CPU cores
 
 The test suite supports the following environment variables:
 
+### `DB_PORT` (Recommended for parallel branches)
+
+Port number for the database connection. The test suite will construct the full connection string automatically.
+
+```bash
+export DB_PORT=5435
+```
+
+This is particularly useful when running tests on different branches simultaneously, as each branch can use a different port.
+
+**Priority**: If `DB_URL` or `DBURL` is set, `DB_PORT` is ignored.
+
 ### `DB_URL` (Primary)
 
-Primary database connection string.
+Full database connection string.
 
 ```bash
 export DB_URL=postgresql://postgres@localhost:5435/postgres
@@ -231,7 +335,19 @@ Alternative name for database URL (for compatibility).
 export DBURL=postgresql://postgres@localhost:5435/postgres
 ```
 
-**Priority**: `DB_URL` takes precedence over `DBURL` if both are set.
+**Priority**: `DB_URL` takes precedence over `DBURL`, which takes precedence over `DB_PORT`. If none are set, defaults to port 5435.
+
+### `POSTGRES_VERSION`
+
+PostgreSQL version to use when starting the database container. Defaults to **15**.
+
+```bash
+export POSTGRES_VERSION=16
+```
+
+This is used by `docker compose` or `docker-compose` to select the PostgreSQL image version. For podman/docker commands, specify the version directly in the image tag (e.g., `postgres:16`).
+
+**Note**: This only affects `docker compose up` or `docker-compose up`. For podman/docker commands, specify the version in the image tag.
 
 ### Loading from `.env` File
 
@@ -239,7 +355,14 @@ The test suite automatically loads environment variables from `.env` files using
 
 Create a `.env` file in the project root:
 ```bash
-DB_URL=postgresql://postgres@localhost:5435/postgres
+# Recommended: Use DB_PORT for easy port switching
+DB_PORT=5435
+
+# PostgreSQL version (for docker-compose, defaults to 15)
+POSTGRES_VERSION=15
+
+# Or use full connection string
+# DB_URL=postgresql://postgres@localhost:5435/postgres
 ```
 
 **Note**: `.env` files are gitignored. Create a `.env.example` file as a template for other developers.
@@ -257,7 +380,8 @@ DB_URL=postgresql://postgres@localhost:5435/postgres
    ```bash
    docker ps  # Should show postgres container
    # Or
-   docker-compose ps
+   docker compose ps
+   # Or: docker-compose ps
    ```
 
 2. Check port is correct:
@@ -307,6 +431,7 @@ DB_URL=postgresql://postgres@localhost:5435/postgres
 2. Use different port:
    - Update `docker-compose.yml` port mapping
    - Update `DB_URL` to match new port
+   - Or use `DB_PORT` environment variable
 
 ### Database Does Not Exist
 
@@ -335,7 +460,8 @@ DB_URL=postgresql://postgres@localhost:5435/postgres
 
 3. Restart database:
    ```bash
-   docker-compose restart
+   docker compose restart
+   # Or: docker-compose restart
    ```
 
 ### Import Errors
@@ -475,11 +601,22 @@ See `.github/workflows/pytest.yaml` for details.
 ## Quick Reference
 
 ```bash
-# Start database
-docker-compose up -d
+# Start database (prefer podman if available)
+# Default PostgreSQL version 15
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:15
+# Or use version 16
+podman run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres:16
+# Or with docker compose (defaults to PostgreSQL 15)
+docker compose up -d
+# Or: docker-compose up -d
+# Or with docker compose using version 16
+POSTGRES_VERSION=16 docker compose up -d
+# Or: POSTGRES_VERSION=16 docker-compose up -d
 
-# Set connection
-export DB_URL=postgresql://postgres@localhost:5435/postgres
+# Set connection (use DB_PORT for parallel branches)
+export DB_PORT=5435
+# Or use full connection string
+# export DB_URL=postgresql://postgres@localhost:5435/postgres
 
 # Run all tests
 uv run pytest
@@ -491,6 +628,9 @@ uv run pytest -m unit
 uv run pytest --cov=dbsamizdat --cov-report=term-missing
 
 # Stop database
-docker-compose down
+podman stop <container-id>
+# Or with docker compose
+docker compose down
+# Or: docker-compose down
 ```
 

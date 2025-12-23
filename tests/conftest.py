@@ -29,12 +29,23 @@ def db_args():
     Database connection arguments.
 
     Scope: session - created once and reused for all tests.
-    Uses DB_URL environment variable or defaults to local PostgreSQL.
+    Uses DB_URL environment variable or constructs from DB_PORT if set.
+    Defaults to local PostgreSQL on port 5435.
+
+    Environment variables:
+        DB_URL: Full database connection string (takes precedence)
+        DBURL: Alternative name for DB_URL (for compatibility)
+        DB_PORT: Port number (used if DB_URL/DBURL not set)
     """
+    db_url = os.environ.get("DB_URL") or os.environ.get("DBURL")
+    if not db_url:
+        # Use DB_PORT if set, otherwise default to 5435
+        port = os.environ.get("DB_PORT", "5435")
+        db_url = f"postgresql://postgres@localhost:{port}/postgres"
     return ArgType(
         txdiscipline="jumbo",
         verbosity=3,
-        dburl=os.environ.get("DB_URL", os.environ.get("DBURL", "postgresql://postgres@localhost:5435/postgres")),
+        dburl=db_url,
     )
 
 
@@ -208,6 +219,8 @@ def django_setup():
         from django.conf import settings
 
         if not settings.configured:
+            # Use DB_PORT if set, otherwise default to 5435
+            port = os.environ.get("DB_PORT", "5435")
             settings.configure(
                 DEBUG=True,
                 DATABASES={
@@ -217,7 +230,7 @@ def django_setup():
                         "USER": "postgres",
                         "PASSWORD": "",
                         "HOST": "localhost",
-                        "PORT": "5435",
+                        "PORT": port,
                     }
                 },
                 INSTALLED_APPS=[
