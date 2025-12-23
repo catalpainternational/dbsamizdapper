@@ -367,20 +367,147 @@ class MyView(SamizdatView):
 
 **Important**: PostgreSQL's `$$` dollar-quoting syntax does **not** work in SQL templates because it clashes with Python's `string.Template` processing. Use a tag like `$BODY$` instead.
 
-```python
-from dbsamizdat import SamizdatFunction, SamizdatTrigger
+#### Function Signature Handling
 
+When creating `SamizdatFunction` classes, you need to understand how `function_arguments_signature` and `sql_template` interact. There are two valid approaches:
+
+**Option A: Full CREATE FUNCTION in template** (Less common)
+
+Include the complete `CREATE FUNCTION` statement in your `sql_template` and set `function_arguments_signature = ""`:
+
+```python
 class MyFunction(SamizdatFunction):
+    function_arguments_signature = ""  # Empty when using full CREATE FUNCTION
+    sql_template = f"""
+        CREATE FUNCTION {MyFunction.db_object_identity()}
+        RETURNS TEXT AS
+        $BODY$
+        BEGIN
+            RETURN 'Hello';
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+```
+
+**Option B: Use `${preamble}` (Recommended)**
+
+Omit `CREATE FUNCTION` from your template and use `${preamble}`, which automatically includes `CREATE FUNCTION {schema}.{name}({signature})`. Set `function_arguments_signature` to your parameter signature:
+
+```python
+class MyFunction(SamizdatFunction):
+    function_arguments_signature = "name TEXT"  # Parameter signature
     sql_template = """
         ${preamble}
         RETURNS TEXT AS
         $BODY$
         BEGIN
-            RETURN UPPER(input);
+            RETURN UPPER(name);
         END;
         $BODY$
         LANGUAGE plpgsql;
     """
+```
+
+**Important Behavior:**
+
+- `creation_identity()` always includes parentheses: `"schema"."name"({args})`
+- Even when `function_arguments_signature = ""`, it becomes `"schema"."name"()`
+- If you include `CREATE FUNCTION` in your template AND use `${preamble}`, you'll get signature duplication errors like `CREATE FUNCTION name(sig)(sig)` - avoid this!
+
+#### Function Examples
+
+**Function with no parameters:**
+
+```python
+class SimpleFunction(SamizdatFunction):
+    function_arguments_signature = ""  # No parameters
+    sql_template = """
+        ${preamble}
+        RETURNS TEXT AS
+        $BODY$
+        SELECT 'Hello, World!';
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+**Function with parameters:**
+
+```python
+class GreetFunction(SamizdatFunction):
+    function_arguments_signature = "name TEXT, age INTEGER"
+    sql_template = """
+        ${preamble}
+        RETURNS TEXT AS
+        $BODY$
+        BEGIN
+            RETURN format('Hello %s, you are %s years old', name, age);
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+```
+
+**Function returning a table:**
+
+```python
+class UserStatsFunction(SamizdatFunction):
+    function_arguments_signature = "user_id INTEGER"
+    sql_template = """
+        ${preamble}
+        RETURNS TABLE(
+            total_orders INTEGER,
+            total_spent NUMERIC,
+            last_order_date TIMESTAMP
+        ) AS
+        $BODY$
+        BEGIN
+            RETURN QUERY
+            SELECT
+                COUNT(*)::INTEGER,
+                COALESCE(SUM(amount), 0),
+                MAX(order_date)
+            FROM orders
+            WHERE user_id = user_id;
+        END;
+        $BODY$
+        LANGUAGE plpgsql;
+    """
+```
+
+**Function with function polymorphism (same name, different signatures):**
+
+```python
+class GetUser(SamizdatFunction):
+    function_name = "get_user"  # Shared function name
+    function_arguments_signature = "user_id INTEGER"
+    sql_template = """
+        ${preamble}
+        RETURNS TABLE(id INTEGER, name TEXT) AS
+        $BODY$
+        SELECT id, name FROM users WHERE id = user_id;
+        $BODY$
+        LANGUAGE SQL;
+    """
+
+class GetUserByName(SamizdatFunction):
+    function_name = "get_user"  # Same name, different signature
+    function_arguments_signature = "username TEXT"
+    sql_template = """
+        ${preamble}
+        RETURNS TABLE(id INTEGER, name TEXT) AS
+        $BODY$
+        SELECT id, name FROM users WHERE name = username;
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+#### Triggers
+
+```python
+from dbsamizdat import SamizdatTrigger
 
 class MyTrigger(SamizdatTrigger):
     deps_on = {MyFunction}
@@ -417,6 +544,114 @@ class GoodFunction(SamizdatFunction):
     sql_template = """
         ${preamble}
         RETURNS TEXT AS
+        $BODY$
+        SELECT 'test';
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+### Function Signature Handling Issues
+
+#### Signature Duplication Error
+
+**Problem**: Getting syntax errors like `CREATE FUNCTION name(sig)(sig)` when creating functions.
+
+**Explanation**: This happens when you include `CREATE FUNCTION` in your `sql_template` AND use `${preamble}`. The `${preamble}` already includes `CREATE FUNCTION {schema}.{name}({signature})`, so adding it again causes duplication.
+
+**Solution**: Choose one approach:
+- **Option A**: Include full `CREATE FUNCTION` in template, set `function_arguments_signature = ""`
+- **Option B** (Recommended): Use `${preamble}`, omit `CREATE FUNCTION` from template
+
+```python
+# ❌ This will cause duplication
+class BadFunction(SamizdatFunction):
+    function_arguments_signature = "name TEXT"
+    sql_template = """
+        CREATE FUNCTION "public"."BadFunction"(name TEXT)  # Don't include this!
+        ${preamble}  # This already includes CREATE FUNCTION
+        RETURNS TEXT AS
+        $BODY$
+        SELECT name;
+        $BODY$
+        LANGUAGE SQL;
+    """
+
+# ✅ Correct: Use ${preamble} only
+class GoodFunction(SamizdatFunction):
+    function_arguments_signature = "name TEXT"
+    sql_template = """
+        ${preamble}  # This includes CREATE FUNCTION automatically
+        RETURNS TEXT AS
+        $BODY$
+        SELECT name;
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+#### Empty Signature Still Adds Parentheses
+
+**Problem**: Even when `function_arguments_signature = ""`, the generated SQL includes `()`.
+
+**Explanation**: This is expected behavior. `creation_identity()` always includes parentheses: `"schema"."name"({args})`. When `function_arguments_signature = ""`, it becomes `"schema"."name"()`, which is correct SQL for a function with no parameters.
+
+**Solution**: This is not an error - it's the correct behavior. If you want a function with no parameters, use `function_arguments_signature = ""` and the `()` will be automatically added.
+
+```python
+# ✅ This is correct - the () will be added automatically
+class NoParamFunction(SamizdatFunction):
+    function_arguments_signature = ""  # No parameters
+    sql_template = """
+        ${preamble}  # Generates: CREATE FUNCTION "public"."NoParamFunction"()
+        RETURNS TEXT AS
+        $BODY$
+        SELECT 'Hello';
+        $BODY$
+        LANGUAGE SQL;
+    """
+```
+
+#### Missing CREATE FUNCTION Error
+
+**Problem**: Getting errors about missing `CREATE FUNCTION` statement.
+
+**Explanation**: Your `sql_template` must either:
+1. Include a complete `CREATE FUNCTION` statement (Option A), OR
+2. Use `${preamble}` which provides it automatically (Option B)
+
+**Solution**: Ensure your template includes one of these:
+
+```python
+# ✅ Option A: Full CREATE FUNCTION in template
+class FunctionA(SamizdatFunction):
+    function_arguments_signature = ""
+    sql_template = f"""
+        CREATE FUNCTION {FunctionA.db_object_identity()}()
+        RETURNS TEXT AS
+        $BODY$
+        SELECT 'test';
+        $BODY$
+        LANGUAGE SQL;
+    """
+
+# ✅ Option B: Use ${preamble} (recommended)
+class FunctionB(SamizdatFunction):
+    function_arguments_signature = ""
+    sql_template = """
+        ${preamble}  # Provides CREATE FUNCTION automatically
+        RETURNS TEXT AS
+        $BODY$
+        SELECT 'test';
+        $BODY$
+        LANGUAGE SQL;
+    """
+
+# ❌ This will fail - no CREATE FUNCTION
+class BadFunction(SamizdatFunction):
+    function_arguments_signature = ""
+    sql_template = """
+        RETURNS TEXT AS  # Missing CREATE FUNCTION!
         $BODY$
         SELECT 'test';
         $BODY$

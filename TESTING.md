@@ -145,6 +145,8 @@ docker run -d -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:14
 
 ### 3. Run Tests
 
+**Important**: Ensure the database is ready before running tests. Integration tests require a running PostgreSQL database.
+
 ```bash
 # All tests (requires database)
 uv run pytest
@@ -155,6 +157,8 @@ uv run pytest -m unit
 # Integration tests only (requires database)
 uv run pytest -m integration
 ```
+
+**Note**: Always use `uv run pytest` (not `pytest` or `python -m pytest`) to ensure dependencies are available in the virtual environment.
 
 ---
 

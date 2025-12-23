@@ -125,13 +125,17 @@ The pre-commit configuration (`.pre-commit-config.yaml`) includes:
 
 **Run tests:**
 ```bash
+# Ensure database is ready first (see TESTING.md for setup)
 uv run pytest
 ```
 
 **Run unit tests only:**
 ```bash
+# Unit tests don't require a database
 uv run pytest -m unit
 ```
+
+**Note**: Always use `uv run pytest` (not `pytest` or `python -m pytest`) to ensure dependencies are available in the virtual environment.
 
 **Run with coverage:**
 ```bash
@@ -169,12 +173,14 @@ export DB_URL=postgresql://postgres@localhost:5435/postgres
 
 **Run tests:**
 ```bash
-# All tests (requires database)
+# All tests (requires database - ensure it's ready first!)
 uv run pytest
 
 # Unit tests only (no database required)
 uv run pytest -m unit
 ```
+
+**Important**: Always use `uv run pytest` (not `pytest` or `python -m pytest`) to ensure dependencies are available in the virtual environment. For integration tests, ensure the PostgreSQL database is running and configured (see [TESTING.md](TESTING.md) for setup instructions).
 
 See [TESTING.md](TESTING.md) for detailed testing instructions, troubleshooting, and advanced usage.
 
