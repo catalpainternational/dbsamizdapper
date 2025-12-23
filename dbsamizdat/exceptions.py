@@ -43,22 +43,27 @@ def _detect_error_pattern(error_msg: str, sql: str) -> str | None:
     sql_lower = sql.lower()
 
     # Signature duplication pattern: "syntax error at or near \"(\""
-    if 'syntax error at or near "("' in error_lower or 'syntax error at or near "("' in error_lower:
-        # Check if function signature appears twice
-        if sql_lower.count("create function") > 0 and sql_lower.count("()(") > 0:
-            return (
-                "Signature duplication detected: function_arguments_signature was provided "
-                "but the template also includes a function signature. "
-                "Remove the signature from either the template or the function_arguments_signature attribute."
-            )
+    if (
+        'syntax error at or near "("' in error_lower
+        and sql_lower.count("create function") > 0
+        and sql_lower.count("()(") > 0
+    ):
+        return (
+            "Signature duplication detected: function_arguments_signature was provided "
+            "but the template also includes a function signature. "
+            "Remove the signature from either the template or the function_arguments_signature attribute."
+        )
 
     # Missing CREATE FUNCTION pattern
-    if 'syntax error at or near "returns"' in error_lower:
-        if "create function" not in sql_lower and "returns" in sql_lower:
-            return (
-                "Missing CREATE FUNCTION: The template includes RETURNS but no CREATE FUNCTION statement. "
-                "Ensure your template starts with ${preamble} which includes CREATE FUNCTION."
-            )
+    if (
+        'syntax error at or near "returns"' in error_lower
+        and "create function" not in sql_lower
+        and "returns" in sql_lower
+    ):
+        return (
+            "Missing CREATE FUNCTION: The template includes RETURNS but no CREATE FUNCTION statement. "
+            "Ensure your template starts with ${preamble} which includes CREATE FUNCTION."
+        )
 
     # Invalid template variable pattern
     if 'syntax error at or near "$"' in error_lower or 'syntax error at or near "$"' in error_lower:

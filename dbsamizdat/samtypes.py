@@ -68,10 +68,10 @@ class FQTuple:
         if isinstance(arg, FQTuple):
             return arg
 
-        elif isinstance(arg, str):
+        if isinstance(arg, str):
             return cls(schema="public", object_name=arg)
 
-        elif isinstance(arg, tuple):
+        if isinstance(arg, tuple):
             """
             Convert a 2tuple of schema, thing_name
             """

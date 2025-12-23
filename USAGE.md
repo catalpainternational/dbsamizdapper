@@ -529,6 +529,11 @@ class MyTrigger(SamizdatTrigger):
 
 This section provides actionable checklists and common patterns to help you implement functions and triggers correctly without trial-and-error.
 
+> **See also**: 
+> - [Function Signature Handling](#function-signature-handling) for detailed explanation of function creation approaches
+> - [Template Variables Reference](#template-variables-reference) for complete details on available template variables
+> - [Troubleshooting](#troubleshooting) for solutions to common errors
+
 ### Function Creation Checklist
 
 When creating a `SamizdatFunction`, follow this checklist:

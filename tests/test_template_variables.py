@@ -318,10 +318,10 @@ def test_undefined_template_variable_left_unchanged():
 def test_template_variables_in_fstring():
     """Test that template variables work correctly when used in f-strings (double braces)"""
     class ViewWithFString(SamizdatView):
-        sql_template = f"""
-            ${{preamble}}
+        sql_template = """
+            ${preamble}
             SELECT 1 as value
-            ${{postamble}}
+            ${postamble}
         """
 
     sql = ViewWithFString.create()

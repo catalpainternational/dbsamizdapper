@@ -14,7 +14,6 @@ from dbsamizdat.samizdat import (
     SamizdatTrigger,
 )
 
-
 # ==================== Pattern 1: Simple Function (No Parameters) ====================
 
 
@@ -416,8 +415,8 @@ def test_trigger_checklist_starts_with_preamble():
         on_table = ("public", "test_table")
         condition = "AFTER INSERT"
         deps_on = set()
-        sql_template = f"""
-            ${{preamble}}
+        sql_template = """
+            ${preamble}
             FOR EACH ROW EXECUTE FUNCTION test_func();
         """
 

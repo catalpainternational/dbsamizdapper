@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Function signature handling documentation (Issue #7)
+  - Clear explanation of two approaches for creating functions (Option A: full CREATE FUNCTION, Option B: using `${preamble}`)
+  - Complete examples for functions with no parameters, with parameters, and returning tables
+  - Common pitfalls section covering signature duplication, empty signature behavior, and missing CREATE FUNCTION errors
+  - Comprehensive troubleshooting guide in USAGE.md
+- Comprehensive template variable reference (Issue #8)
+  - Complete reference of all available template variables (`${preamble}`, `${postamble}`, `${samizdatname}`) by entity type
+  - Detailed documentation for function references in triggers using `creation_identity()` method
+  - Examples showing template variable usage in functions, triggers, views, tables, and materialized views
+  - Template Variable Summary Table for quick reference
+- Best Practices and Common Patterns guide (Issue #10)
+  - Function Creation Checklist with actionable steps
+  - Trigger Creation Checklist with actionable steps
+  - Common Patterns section with complete working examples:
+    - Simple function (no parameters)
+    - Function with parameters
+    - Trigger calling function
+    - Multi-function dependencies
+  - Quick Reference section highlighting common mistakes to avoid
+  - Comprehensive test suite (`tests/test_best_practices.py`) verifying all documented patterns
 - Enhanced error messages for SQL template processing failures (Issue #9)
   - Error messages now show original template, template variable substitutions, and function signature context
   - Automatic detection of common error patterns with helpful hints:

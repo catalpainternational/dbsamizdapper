@@ -9,7 +9,6 @@ import pytest
 
 from dbsamizdat.runner import cmd_sync, get_cursor
 from dbsamizdat.samizdat import SamizdatFunction, SamizdatTable
-from dbsamizdat.samtypes import FQTuple
 
 # ==================== Test Function Definitions ====================
 
@@ -194,7 +193,7 @@ def test_creation_identity_includes_parentheses():
     # Even with empty signature, should have ()
     identity = SimpleFunctionOptionB.creation_identity()
     assert identity.endswith("()")
-    assert '"public"."SimpleFunctionOptionB"()' == identity
+    assert identity == '"public"."SimpleFunctionOptionB"()'
 
     # With parameters, should include them
     identity = FunctionWithParamsOptionB.creation_identity()
@@ -220,10 +219,10 @@ def test_fq_includes_signature():
 def test_db_object_identity_includes_signature():
     """Test that db_object_identity() includes function signature"""
     identity = SimpleFunctionOptionB.db_object_identity()
-    assert '"public"."SimpleFunctionOptionB"()' == identity
+    assert identity == '"public"."SimpleFunctionOptionB"()'
 
     identity = FunctionWithParamsOptionB.db_object_identity()
-    assert '"public"."FunctionWithParamsOptionB"(name TEXT, age INTEGER)' == identity
+    assert identity == '"public"."FunctionWithParamsOptionB"(name TEXT, age INTEGER)'
 
 
 @pytest.mark.unit
