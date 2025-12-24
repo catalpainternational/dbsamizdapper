@@ -96,7 +96,37 @@ def executor(
                             (sd.schema, getattr(sd, "function_name", sd.get_name())),
                         )
                         candidate_args = [row[0] for row in cursor.fetchall() if row[0]]
-                    raise FunctionSignatureError(sd, candidate_args)
+                    
+                    # If we found exactly one candidate and this is a function with empty signature,
+                    # automatically retry with the correct signature
+                    if len(candidate_args) == 1 and candidate_args[0] and sd.entity_type.value == "FUNCTION":
+                        from ..samtypes import FQTuple
+                        # Create FQTuple with the correct signature from database
+                        correct_fq = FQTuple(
+                            schema=sd.schema,
+                            object_name=getattr(sd, "function_name", sd.get_name()),
+                            args=candidate_args[0]
+                        )
+                        # Generate the COMMENT statement with the correct signature
+                        comment_sql = cursor.mogrify(
+                            f"""COMMENT ON {sd.entity_type.value} {correct_fq.db_object_identity()} IS %s;""",
+                            (sd.dbinfo(),),
+                        )
+                        if isinstance(comment_sql, bytes):
+                            comment_sql = comment_sql.decode()
+                        # Retry with the correct signature
+                        try:
+                            cursor.execute(f"SAVEPOINT action_{action_totake}_retry;")
+                            cursor.execute(comment_sql)
+                            # Success! Continue to next action
+                            continue
+                        except Exception:
+                            # If retry also fails, raise the original error with candidates
+                            cursor.execute(f"ROLLBACK TO SAVEPOINT action_{action_totake};")
+                            raise FunctionSignatureError(sd, candidate_args)
+                    else:
+                        # Multiple candidates or none found - raise error
+                        raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
         except Exception as dberr:
             # Capture template context for better error messages
