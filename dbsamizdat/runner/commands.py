@@ -55,10 +55,17 @@ def cmd_refresh(args: ArgType):
         # If belownodes is specified, we need the dependency graph even if samizdatmodules=[]
         # Use autodiscovery but filter to only samizdats that exist in the database
         if args.belownodes and samizdatmodules == []:
-            # Use autodiscovery to get dependency information
-            all_samizdats = get_sds(args.in_django, samizdatmodules=None)
+            # Get all samizdats from autodiscovery (without sanity_check to avoid NameClashError)
+            from ..loader import get_samizdats
+            from ..libgraph import depsort_with_sidekicks
+            
+            all_samizdats = set(get_samizdats())
             # Filter to only those that exist in the database (avoids NameClashError from test classes)
-            samizdats = [sd for sd in all_samizdats if sd.fq() in db_fqs]
+            filtered_samizdats = {sd for sd in all_samizdats if sd.fq() in db_fqs}
+            # Now run sanity_check and sorting on the filtered set
+            from ..libgraph import sanity_check
+            sanity_check(filtered_samizdats)
+            samizdats = list(depsort_with_sidekicks(filtered_samizdats))
         else:
             samizdats = get_sds(args.in_django, samizdatmodules=samizdatmodules)
         
