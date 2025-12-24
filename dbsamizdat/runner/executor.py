@@ -77,9 +77,25 @@ def executor(
             except Exception as ouch:
                 if action_totake == "sign":
                     cursor.execute(f"ROLLBACK TO SAVEPOINT action_{action_totake};")  # get back to a non-error state
+                    # First try get_dbstate (filters by comments - for already-signed functions)
                     candidate_args = [
                         c[3] for c in get_dbstate(cursor) if c[:2] == (sd.schema, getattr(sd, "function_name", ""))
                     ]
+                    # If not found and this is a function, query pg_proc directly
+                    # (for functions that were just created but not yet signed)
+                    if not candidate_args and sd.entity_type.value == "FUNCTION":
+                        cursor.execute(
+                            """
+                            SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
+                            FROM pg_catalog.pg_proc p
+                            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+                            WHERE n.nspname = %s
+                              AND p.proname = %s
+                              AND p.prokind NOT IN ('a', 'w', 'p')
+                            """,
+                            (sd.schema, getattr(sd, "function_name", sd.get_name())),
+                        )
+                        candidate_args = [row[0] for row in cursor.fetchall() if row[0]]
                     raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
         except Exception as dberr:

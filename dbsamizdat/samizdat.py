@@ -100,58 +100,17 @@ class Samizdat(ProtoSamizdat):
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
         
-        For Option A functions (where function_arguments_signature is empty but the
-        function has parameters), this method will query the database to find the
-        actual function signature if the initial attempt fails.
+        Note: For Option A functions with parameters, if signing fails due to
+        incorrect signature, the executor will query the database to find the
+        actual signature and raise FunctionSignatureError with candidate arguments.
         """
-        # Try with the current db_object_identity first
-        try:
-            comment = cursor.mogrify(
-                f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
-                (cls.dbinfo(),),
-            )
-            if isinstance(comment, bytes):
-                return comment.decode()
-            return comment
-        except Exception as e:
-            # If that fails and this is a function with empty function_arguments_signature,
-            # try to find the actual signature from the database
-            if cls.entity_type == entitypes.FUNCTION and not cls.function_arguments_signature:
-                # Query pg_proc directly to find functions by name (don't filter by comment)
-                # since the function was just created and may not be signed yet
-                cursor.execute(
-                    """
-                    SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
-                    FROM pg_catalog.pg_proc p
-                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-                    WHERE n.nspname = %s
-                      AND p.proname = %s
-                      AND p.prokind NOT IN ('a', 'w', 'p')
-                    """,
-                    (cls.schema, cls.get_name()),
-                )
-                results = cursor.fetchall()
-                
-                # If we found exactly one match, use its signature
-                if len(results) == 1 and results[0][0]:
-                    # Create a temporary FQTuple with the correct signature
-                    from ..samtypes import FQTuple
-                    temp_fq = FQTuple(
-                        schema=cls.schema,
-                        object_name=cls.get_name(),
-                        args=results[0][0]
-                    )
-                    # Use the correct signature for the COMMENT statement
-                    comment = cursor.mogrify(
-                        f"""COMMENT ON {cls.entity_type.value} {temp_fq.db_object_identity()} IS %s;""",
-                        (cls.dbinfo(),),
-                    )
-                    if isinstance(comment, bytes):
-                        return comment.decode()
-                    return comment
-            
-            # Re-raise the original exception if we couldn't fix it
-            raise
+        comment = cursor.mogrify(
+            f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
+            (cls.dbinfo(),),
+        )
+        if isinstance(comment, bytes):
+            return comment.decode()
+        return comment
 
     @classmethod
     def create(cls):
