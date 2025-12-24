@@ -161,8 +161,30 @@ class FunctionSignatureError(SamizdatException):
         self.candidate_arguments = candidate_arguments
 
     def __str__(self):
-        sd_subject = repr(self.samizdat)
-        candidate_args = "\n".join(self.candidate_arguments)
+        try:
+            sd_subject = repr(self.samizdat)
+        except Exception:
+            sd_subject = f"<samizdat {type(self.samizdat).__name__}>"
+        
+        try:
+            create_sql = sqlfmt(self.samizdat.create())
+        except Exception as e:
+            create_sql = f"<error generating create SQL: {e}>"
+        
+        try:
+            db_identity = self.samizdat.db_object_identity
+        except Exception as e:
+            db_identity = f"<error: {e}>"
+        
+        try:
+            func_args = getattr(self.samizdat, 'function_arguments', None)
+            if func_args is None:
+                func_args = getattr(self.samizdat, 'function_arguments_signature', '')
+            func_args_str = f"({func_args})"
+        except Exception as e:
+            func_args_str = f"<error: {e}>"
+        
+        candidate_args = "\n".join(self.candidate_arguments) if self.candidate_arguments else "<none>"
         args_herald = (
             f"the following candidates:\n{candidate_args}"
             if len(self.candidate_arguments) > 1
@@ -170,16 +192,16 @@ class FunctionSignatureError(SamizdatException):
         )
         return f"""
             After executing:
-            {sqlfmt(self.samizdat.create())}
+            {create_sql}
 
             which we did in order to create the samizdat function:
             {sd_subject}
 
             we were not able to identify the resulting database function via its call signature of:
-            {self.samizdat.db_object_identity}
+            {db_identity}
 
             because, we figure, that is not actually the effective call signature resulting from the function arguments, which are:
-            "({getattr(self.samizdat, 'function_arguments', getattr(self.samizdat, 'function_arguments_signature', ''))})"
+            "{func_args_str}"
 
             We queried the database to find out what the effective call argument signature should be instead, and came up with:
             {args_herald}
