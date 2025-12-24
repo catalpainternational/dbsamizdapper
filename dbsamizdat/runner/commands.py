@@ -38,7 +38,8 @@ def cmd_refresh(args: ArgType):
         - Uses concurrent refresh when allowed
     """
     with get_cursor(args) as cursor:
-        samizdats = get_sds(args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None) or [])
+        # Use None (not []) to allow autodiscovery when samizdatmodules not specified
+        samizdats = get_sds(args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None))
         matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
