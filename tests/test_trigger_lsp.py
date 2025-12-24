@@ -286,8 +286,7 @@ def test_trigger_lsp_compliance_after_fix():
         # All Samizdats should have a proper schema (str or None)
         if samizdat_cls.schema is None:
             return "no_schema"
-        else:
-            return f"schema: {samizdat_cls.schema}"
+        return f"schema: {samizdat_cls.schema}"
 
     # Works with regular Samizdat
     from dbsamizdat.samizdat import SamizdatView

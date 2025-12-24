@@ -77,13 +77,108 @@ def executor(
             except Exception as ouch:
                 if action_totake == "sign":
                     cursor.execute(f"ROLLBACK TO SAVEPOINT action_{action_totake};")  # get back to a non-error state
+                    # First try get_dbstate (filters by comments - for already-signed functions)
                     candidate_args = [
                         c[3] for c in get_dbstate(cursor) if c[:2] == (sd.schema, getattr(sd, "function_name", ""))
                     ]
-                    raise FunctionSignatureError(sd, candidate_args)
+                    # If not found and this is a function, query pg_proc directly
+                    # (for functions that were just created but not yet signed)
+                    if not candidate_args and sd.entity_type.value == "FUNCTION":
+                        func_name = getattr(sd, "function_name", sd.get_name())
+                        # Query for functions matching schema and name
+                        # Note: PostgreSQL stores function names exactly as created (case-sensitive if quoted)
+                        cursor.execute(
+                            """
+                            SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
+                            FROM pg_catalog.pg_proc p
+                            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+                            WHERE n.nspname = %s
+                              AND p.proname = %s
+                              AND p.prokind NOT IN ('a', 'w', 'p')
+                            """,
+                            (sd.schema, func_name),
+                        )
+                        candidate_args = [row[0] for row in cursor.fetchall() if row[0]]
+                    
+                    # If we found exactly one candidate and this is a function with empty signature,
+                    # automatically retry with the correct signature
+                    if len(candidate_args) == 1 and candidate_args[0] and sd.entity_type.value == "FUNCTION":
+                        from ..samtypes import FQTuple
+                        # Create FQTuple with the correct signature from database
+                        correct_fq = FQTuple(
+                            schema=sd.schema,
+                            object_name=getattr(sd, "function_name", sd.get_name()),
+                            args=candidate_args[0]
+                        )
+                        # Generate the COMMENT statement with the correct signature
+                        comment_sql = cursor.mogrify(
+                            f"""COMMENT ON {sd.entity_type.value} {correct_fq.db_object_identity()} IS %s;""",
+                            (sd.dbinfo(),),
+                        )
+                        if isinstance(comment_sql, bytes):
+                            comment_sql = comment_sql.decode()
+                        # Retry with the correct signature
+                        try:
+                            cursor.execute(f"SAVEPOINT action_{action_totake}_retry;")
+                            cursor.execute(comment_sql)
+                            # Success! Continue to next action
+                            continue
+                        except Exception:
+                            # If retry also fails, raise the original error with candidates
+                            cursor.execute(f"ROLLBACK TO SAVEPOINT action_{action_totake};")
+                            raise FunctionSignatureError(sd, candidate_args)
+                    else:
+                        # Multiple candidates or none found - raise error
+                        raise FunctionSignatureError(sd, candidate_args)
                 raise ouch
         except Exception as dberr:
-            raise DatabaseError(f"{action_totake} failed", dberr, sd, sql)
+            # Capture template context for better error messages
+            template = None
+            substitutions = None
+
+            if action_totake == "create" and hasattr(sd, "get_sql_template"):
+                try:
+                    template = sd.get_sql_template()
+                    # Extract substitutions that were used
+                    if hasattr(sd, "entity_type"):
+                        from ..samizdat import sd_is_function, sd_is_matview, sd_is_trigger
+
+                        substitutions = {}
+                        if sd_is_function(sd):
+                            substitutions = {
+                                "preamble": f"CREATE {sd.entity_type.value} {sd.creation_identity()}",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                        elif sd_is_trigger(sd):
+                            from ..samtypes import FQTuple
+
+                            target_table = FQTuple.fqify(sd.on_table).db_object_identity()
+                            substitutions = {
+                                "preamble": f"""CREATE {sd.entity_type.value} "{sd.get_name()}" {sd.condition} ON {target_table}""",
+                                "samizdatname": sd.get_name(),
+                            }
+                        elif sd_is_matview(sd):
+                            _AS = " AS "
+                            opts = ["UNLOGGED "] if getattr(sd, "unlogged", False) else []
+                            substitutions = {
+                                "preamble": f"""CREATE {" ".join(opts)}{sd.entity_type.value} {sd.db_object_identity()}{_AS}""",
+                                "postamble": "WITH NO DATA",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                        else:
+                            # For views and tables
+                            _AS = "" if sd.entity_type.name == "TABLE" else " AS "
+                            opts = ["UNLOGGED "] if getattr(sd, "unlogged", False) else []
+                            substitutions = {
+                                "preamble": f"""CREATE {" ".join(opts)}{sd.entity_type.value} {sd.db_object_identity()}{_AS}""",
+                                "postamble": "",
+                                "samizdatname": sd.db_object_identity(),
+                            }
+                except Exception:
+                    # If we can't get template info, continue without it
+                    pass
+
+            raise DatabaseError(f"{action_totake} failed", dberr, sd, sql, template, substitutions)
         cursor.execute(f"RELEASE SAVEPOINT action_{action_totake};")
         if args.txdiscipline == txstyle.CHECKPOINT.value and action_totake != "create":
             # only commit *after* signing, otherwise if later the signing somehow fails

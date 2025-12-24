@@ -185,8 +185,10 @@ def test_get_sds_without_modules_uses_autodiscovery():
     # Note: When all tests run, this may discover samizdats from other test files
     # which could cause name clashes. This test verifies autodiscovery works,
     # not that it finds specific samizdats.
+    # Use None (not []) to trigger autodiscovery
+    # Empty list [] means "no modules", None means "use autodiscovery"
     args = ArgType(
-        samizdatmodules=[],
+        samizdatmodules=None,  # None triggers autodiscovery
         in_django=False,
     )
 

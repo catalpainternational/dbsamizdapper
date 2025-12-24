@@ -224,6 +224,16 @@ For a view or materialized view, add a `${postamble}`. After the postamble, you 
 
 - `function_name` — Defaults to the class name. The reason that this is overridable here is to support function polymorphism: the identity of a DB function is made up of its schema, name, and arguments signature. Thus you might want to create several functions sharing a name but differing in argument signature. If the function name would always be taken from the Python class name, you'd need to have several classes with the same name to support this polymorphism, which would then force you to place them in separate modules — not very convenient.
 - `function_arguments_signature` — Defaults to `''`, that is to say, the function takes no arguments. Specify the argument signature sans parentheses, eg `username TEXT, userid INT`.
+
+  **Important**: How `function_arguments_signature` interacts with `sql_template`:
+  
+  - **Option A**: If you include the full `CREATE FUNCTION` statement in your `sql_template`, set `function_arguments_signature = ""` and manually specify the signature in the template.
+  - **Option B** (Recommended): Omit `CREATE FUNCTION` from your `sql_template` and use `${preamble}`. The `${preamble}` variable automatically includes `CREATE FUNCTION {schema}.{name}({signature})` where `{signature}` comes from `function_arguments_signature`. Set `function_arguments_signature` to your parameter signature (e.g., `"name TEXT, id INT"`).
+  
+  **Note**: Even when `function_arguments_signature = ""`, the generated SQL will include `()` for a function with no parameters. This is expected behavior. Do not include `CREATE FUNCTION` in your template when using `${preamble}` as this causes signature duplication errors.
+  
+  For detailed examples and common pitfalls, see [USAGE.md](USAGE.md#function-signature-handling).
+
 - `function_arguments` — If your function arguments' call signature is different from its arguments (which can be the case, for instance when you use arguments with defaults, and IN/OUT/INOUT/VARIADIC argument types) then you'll have to list your full function arguments here, and repeat the proper signature subset of all that in the `function_arguments_signature`. Because DBSamizdat doesn't interpret SQL, it will not derive the signature from the arguments; you'll need to spell it out.
 
 ## Tips

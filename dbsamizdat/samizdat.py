@@ -99,6 +99,10 @@ class Samizdat(ProtoSamizdat):
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
+        
+        Note: For Option A functions with parameters, if signing fails due to
+        incorrect signature, the executor will query the database to find the
+        actual signature and raise FunctionSignatureError with candidate arguments.
         """
         comment = cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
@@ -146,6 +150,52 @@ class SamizdatTable(Samizdat):
 
 
 class SamizdatFunction(Samizdat):
+    """Base class for defining PostgreSQL functions.
+
+    There are two approaches for defining functions:
+
+    **Option A: Full CREATE FUNCTION in template**
+        Include the complete `CREATE FUNCTION` statement in your `sql_template`
+        and set `function_arguments_signature = ""`.
+
+    **Option B: Use `${preamble}` (Recommended)**
+        Omit `CREATE FUNCTION` from your `sql_template` and use `${preamble}`,
+        which automatically includes `CREATE FUNCTION {schema}.{name}({signature})`.
+        Set `function_arguments_signature` to your parameter signature
+        (e.g., `"name TEXT, id INT"`).
+
+    Attributes:
+        function_arguments_signature: Parameter signature without parentheses.
+            Defaults to `""` (no parameters). Example: `"name TEXT, age INTEGER"`.
+        function_name: Override the function name. Defaults to the class name.
+            Useful for function polymorphism (multiple functions with same name,
+            different signatures).
+        function_arguments: Full function arguments including defaults, IN/OUT/INOUT,
+            etc. Only needed when call signature differs from full arguments.
+        autorefresher: Flag indicating if this function is auto-generated for
+            materialized view refresh triggers.
+
+    Important:
+        - `creation_identity()` always includes parentheses: `"schema"."name"({args})`
+        - Even when `function_arguments_signature = ""`, it becomes `"schema"."name"()`
+        - Do not include `CREATE FUNCTION` in your template when using `${preamble}`
+          as this causes signature duplication errors.
+
+    For detailed examples and common pitfalls, see USAGE.md.
+
+    Example:
+        >>> class MyFunction(SamizdatFunction):
+        ...     function_arguments_signature = "name TEXT"
+        ...     sql_template = '''
+        ...         ${preamble}
+        ...         RETURNS TEXT AS
+        ...         $BODY$
+        ...         SELECT UPPER(name);
+        ...         $BODY$
+        ...         LANGUAGE SQL;
+        ...     '''
+    """
+
     entity_type = entitypes.FUNCTION
     function_arguments_signature = ""
     autorefresher = False

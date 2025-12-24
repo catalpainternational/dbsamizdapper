@@ -39,7 +39,10 @@ def node_dump(samizdats: Iterable[Samizdat]):
     """
     All nodes (managed or unmanaged)
     """
-    return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq()} for sd in samizdats))
+    samizdats_list = list(samizdats)
+    if not samizdats_list:
+        return set()
+    return reduce(or_, (sd.fqdeps_on_unmanaged() | {sd.fq()} for sd in samizdats_list))
 
 
 def unmanaged_refs(samizdats: Iterable[Samizdat | SamizdatWithSidekicks]):

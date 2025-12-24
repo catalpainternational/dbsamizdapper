@@ -134,8 +134,10 @@ def get_sds(
     if samizdats:
         # Explicit list takes highest precedence
         sds = set(samizdats)
-    elif samizdatmodules:
+    elif samizdatmodules is not None:
         # Import modules and discover samizdats within them
+        # Note: Empty list means "no modules" (returns empty set)
+        # None means "not specified" (falls through to autodiscovery)
         modules = import_samizdat_modules(samizdatmodules)
         sds = set()
         for module in modules:
