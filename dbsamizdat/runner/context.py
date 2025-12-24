@@ -6,17 +6,17 @@ This module handles database connections and transaction management:
 - txi_finalize: Transaction finalization (commit/rollback)
 """
 
-from collections.abc import Generator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from importlib.util import find_spec
-from typing import Literal
+from typing import Any, Literal
 
 from ..samtypes import Cursor
 from .types import ArgType
 
 
 @contextmanager
-def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
+def get_cursor(args: ArgType) -> Iterator[Cursor]:
     """
     Get a database cursor with automatic transaction management.
 
@@ -25,7 +25,7 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     2. Begins a transaction
     3. Yields cursor for use
     4. Finalizes transaction based on txdiscipline
-    5. Closes cursor
+    5. Closes cursor and connection
 
     Args:
         args: ArgType with dburl/dbconn and txdiscipline settings
@@ -42,6 +42,7 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
         ...     result = cursor.fetchone()
     """
     dburl = getattr(args, "dburl", None)
+    conn: Any = None  # Connection type varies by driver (psycopg, psycopg2, Django)
 
     if args.in_django:
         from django.db import connections
@@ -63,10 +64,14 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
     else:
         raise NotImplementedError("Required: a Django project or psycopg[2] and a DB url")
 
-    cursor.execute("BEGIN;")
-    yield cursor
-    txi_finalize(cursor, getattr(args, "txdiscipline", "dryrun"))
-    cursor.close()
+    try:
+        cursor.execute("BEGIN;")
+        yield cursor
+        txi_finalize(cursor, getattr(args, "txdiscipline", "dryrun"))
+    finally:
+        cursor.close()
+        if conn is not None:
+            conn.close()
 
 
 def txi_finalize(cursor: Cursor, txdiscipline: Literal["jumbo", "dryrun", "checkpoint"]):

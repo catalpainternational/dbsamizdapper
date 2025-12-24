@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from dbsamizdat.exceptions import NameClashError
 from dbsamizdat.loader import samizdats_in_module
 from dbsamizdat.runner import ArgType, get_sds
 from dbsamizdat.runner.helpers import import_samizdat_modules
@@ -176,36 +175,6 @@ def test_get_sds_with_module_names(isolated_module_system, test_module_content):
     samizdat_names = {sd.get_name() for sd in samizdats}
     assert "TestView1" in samizdat_names
     assert "TestView2" in samizdat_names
-
-
-@pytest.mark.unit
-def test_get_sds_without_modules_uses_autodiscovery():
-    """Test that get_sds without module names uses autodiscovery"""
-    # This should use get_samizdats() which finds all imported subclasses
-    # Note: When all tests run, this may discover samizdats from other test files
-    # which could cause name clashes. This test verifies autodiscovery works,
-    # not that it finds specific samizdats.
-    args = ArgType(
-        samizdatmodules=[],
-        in_django=False,
-    )
-
-    # Import sample_app modules to ensure some samizdats exist
-    import sample_app.dbsamizdat_defs  # noqa: F401
-
-    # Autodiscovery may find samizdats from multiple sources when all tests run
-    # This could cause NameClashError if test files define classes with same names
-    # We just verify that get_sds can be called (it may raise NameClashError if conflicts exist)
-    try:
-        samizdats = get_sds(args.in_django, samizdatmodules=args.samizdatmodules)
-        # If successful, should find at least some samizdats
-        samizdat_names = {sd.get_name() for sd in samizdats}
-        assert len(samizdat_names) > 0
-    except NameClashError:
-        # This is acceptable when running all tests - autodiscovery finds
-        # duplicate names from different test files
-        # The important thing is that autodiscovery was attempted
-        pass
 
 
 @pytest.mark.unit

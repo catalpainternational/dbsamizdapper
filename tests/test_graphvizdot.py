@@ -105,7 +105,8 @@ def test_dot_with_dependencies():
     assert "DependentView" in dot_str
     assert "->" in dot_str  # Dependency edge
     # Should have edge from BaseView to DependentView
-    assert "BaseView" in dot_str and "DependentView" in dot_str
+    assert "BaseView" in dot_str
+    assert "DependentView" in dot_str
 
 
 @pytest.mark.unit

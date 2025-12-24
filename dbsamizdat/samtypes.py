@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable  # noqa: TC003
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Protocol
@@ -68,10 +68,10 @@ class FQTuple:
         if isinstance(arg, FQTuple):
             return arg
 
-        elif isinstance(arg, str):
+        if isinstance(arg, str):
             return cls(schema="public", object_name=arg)
 
-        elif isinstance(arg, tuple):
+        if isinstance(arg, tuple):
             """
             Convert a 2tuple of schema, thing_name
             """
@@ -84,19 +84,21 @@ class FQTuple:
             if len(arg) == 3:
                 return cls(schema=arg[0], object_name=arg[1], args=arg[2])
 
-        elif hasattr(arg, "fq"):
+            # If tuple length is not 1, 2, or 3, raise error
+            raise ValueError(f"Tuple must have 1, 2, or 3 elements, got {len(arg)}")
+
+        if hasattr(arg, "fq"):
             """
             Convert a Samizdat like instance
             """
             return arg.fq()
 
-        elif hasattr(arg, "_meta"):
+        if hasattr(arg, "_meta"):
             # If a django-like instance with a `_meta` prop is provided
             # use its db_table to determine a fully qualified name
             return cls.fqify(arg._meta.db_table)
 
-        else:
-            raise TypeError
+        raise TypeError
 
 
 type objectname = str
@@ -197,14 +199,43 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     def get_sql_template(cls) -> sql_query:
+        """
+        Get the SQL template for this class.
+
+        Handles:
+        - String templates (most common case)
+        - Callable templates (e.g., @classmethod in SamizdatQuerySet)
+        - Missing templates (reconstructed classes from database)
+
+        Raises:
+            AttributeError: If sql_template is missing and this is not a reconstructed class
+        """
+        if not hasattr(cls, "sql_template"):
+            # Reconstructed classes from database don't have sql_template
+            # Check for presence of implanted_hash attribute (even if empty/None)
+            if hasattr(cls, "implanted_hash"):
+                raise AttributeError(
+                    f"Class {cls.__name__} has no 'sql_template' attribute. "
+                    "This is a dynamically reconstructed class from the database. "
+                    "Use 'implanted_hash' instead of calling get_sql_template()."
+                )
+            raise AttributeError(
+                f"Class {cls.__name__} has no 'sql_template' attribute. " "Did you mean: 'get_sql_template'?"
+            )
+
         template: sql_query | Callable[[], sql_query] = cls.sql_template
+
         if isinstance(template, str):
             return template
-        return template()
+
+        if callable(template):
+            return template()
+
+        return template
 
     @classmethod
     def db_object_identity(cls) -> str:
-        return cls.fq().db_object_identity()
+        return str(cls.fq().db_object_identity())
 
     @classmethod
     @abstractmethod

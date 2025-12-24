@@ -1,9 +1,11 @@
 # Test Status
 
+> **Note**: This file is outdated. For current testing information, see [TESTING.md](TESTING.md).
+
 ## Test Results Summary
 
-**Date**: Current
-**Total Tests**: 86
+**Date**: Last Updated (Outdated)
+**Total Tests**: ~146+ (exact count may vary)
 **Status**: ✅ All tests that don't require a database are passing
 
 ### Test Breakdown
@@ -23,17 +25,18 @@ The following tests require a running PostgreSQL instance on `localhost:5435`:
 - Integration tests in `test_trigger_lsp.py`
 - Integration tests in `test_cursor_protocol.py`
 
-To run these tests, start a PostgreSQL container:
+To run these tests, see [TESTING.md](TESTING.md) for complete setup instructions.
 
+**Quick start:**
 ```bash
-docker run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:latest
-# or
-podman run -p 5435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust docker.io/library/postgres
-```
+# Start database
+docker-compose up -d
 
-Then set the environment variable:
-```bash
-export DB_URL="postgresql://postgres@localhost:5435/postgres"
+# Set connection
+export DB_URL=postgresql://postgres@localhost:5435/postgres
+
+# Run tests
+uv run pytest
 ```
 
 ### All Unit Tests Pass ✅
@@ -62,19 +65,9 @@ All new tests pass successfully.
 
 ## Running Tests
 
-### Run all unit tests (no database required):
-```bash
-uv run pytest tests/ -m "unit" -v
-```
+For detailed testing instructions, see [TESTING.md](TESTING.md).
 
-### Run all tests (requires database):
-```bash
-# Start PostgreSQL first, then:
-export DB_URL="postgresql://postgres@localhost:5435/postgres"
-uv run pytest tests/ -v
-```
-
-### Run specific test file:
-```bash
-uv run pytest tests/test_module_import.py -v
-```
+**Quick reference:**
+- Unit tests: `uv run pytest -m unit`
+- All tests: `uv run pytest` (requires database)
+- See [TESTING.md](TESTING.md) for complete guide

@@ -1,20 +1,23 @@
 [project]
 name = "dbsamizdapper"
-version = "0.1.0"
+version = "0.1.1"
 description = "Blissfully naive PostgreSQL database object manager for views, materialized views, functions, and triggers"
 authors = [{name = "Josh Brooks", email = "josh@catalpa.io"}]
-readme = "README.md"
+maintainers = [{name = "Josh Brooks", email = "josh@catalpa.io"}]
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.12"
 license = {file = "LICENSE.txt"}
 keywords = ["postgresql", "database", "views", "materialized-views", "django", "sql"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Database",
+    "Topic :: Database :: Front-Ends",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pytest-cov>=7.0.0",
@@ -26,6 +29,9 @@ Homepage = "https://github.com/catalpainternational/dbsamizdapper"
 Documentation = "https://github.com/catalpainternational/dbsamizdapper#readme"
 Repository = "https://github.com/catalpainternational/dbsamizdapper"
 Issues = "https://github.com/catalpainternational/dbsamizdapper/issues"
+
+[project.scripts]
+dbsamizdat = "dbsamizdat.runner.cli:main"
 
 [project.optional-dependencies]
 django = [
@@ -39,7 +45,7 @@ psycopg3 = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.8.0",
+    "ruff==0.8.4",
     "mypy>=1.3.0",
     "types-toposort>=1.10.0.0",
     "python-dotenv>=1.0.0",
@@ -64,9 +70,6 @@ exclude = [
     "tests/",
     "sample_app/",
 ]
-
-[tool.pylint.format]
-max-line-length = "119"
 
 [tool.ruff]
 line-length = 119
@@ -94,6 +97,10 @@ select = [
     "UP",  # pyupgrade
     "ARG", # flake8-unused-arguments
     "SIM", # flake8-simplify
+    "PT",  # flake8-pytest-style
+    "RET", # flake8-return
+    "TCH", # flake8-type-checking
+    "PTH", # flake8-use-pathlib
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
@@ -117,6 +124,13 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = false
 
 [[tool.mypy.overrides]]
 module = [
@@ -149,6 +163,7 @@ exclude_lines = [
 show_missing = true
 skip_covered = false
 precision = 2
+fail_under = 55
 
 [tool.coverage.html]
 directory = "htmlcov"

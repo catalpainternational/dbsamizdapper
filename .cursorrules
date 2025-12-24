@@ -48,17 +48,91 @@ After adding a feature:
 - Follow existing code patterns
 - Use ruff for formatting and linting
 - Write tests for new functionality
-- Use conventional commits for commit messages
+
+## Commits
+
+- Use [conventional commits](https://www.conventionalcommits.org/) format
+- Keep commits small (one logical change per commit)
+- Keep commit descriptions short (2-3 lines)
+
+## Type Checking
+
+- All public APIs must have type hints
+- Use `# type: ignore` sparingly and always include a comment explaining why
+- Run `uv run mypy dbsamizdat` before committing
+- Prefer `X | Y` syntax over `Union[X, Y]` (Python 3.12+)
+- Use `from __future__ import annotations` for forward references when needed
+
+## Docstrings
+
+- Use Google-style docstrings for all public functions/classes
+- Include Args, Returns, Raises sections
+- Add examples for complex functions
+- Document parameter types and return types in docstrings
+
+Example:
+```python
+def sync(dburl: str, samizdatmodules: list[str]) -> None:
+    """Sync database objects to match Python definitions.
+
+    Args:
+        dburl: PostgreSQL connection string
+        samizdatmodules: List of module names containing Samizdat classes
+
+    Raises:
+        DatabaseError: If database connection fails
+        SamizdatException: If sync operation fails
+
+    Example:
+        >>> sync("postgresql:///mydb", ["myapp.views"])
+    """
+```
+
+## Security
+
+- Never use string formatting for SQL queries (use parameterized queries)
+- Validate all user inputs
+- Document security considerations in docstrings
+- Be especially careful with database connection strings and SQL generation
+
+## Imports
+
+- Ruff/isort handles import sorting automatically
+- Group imports: stdlib, third-party, first-party
+- Use `from __future__ import annotations` for forward references
+- Avoid circular imports
+
+## Exception Handling
+
+- Use custom exceptions from `dbsamizdat.exceptions` when appropriate
+- Always include context in error messages
+- Use `raise ... from ...` when chaining exceptions
+- Document exceptions that functions may raise in docstrings
+
+## API Design
+
+- Prefix private APIs with single underscore (`_private_method`)
+- Public APIs should be well-documented with type hints and docstrings
+- Maintain backward compatibility for public APIs
+- Use Protocol types for flexible interfaces (see `dbsamizdat.samtypes`)
 
 ## Testing
 
 - All new code should have tests
 - Integration tests require a running PostgreSQL database
 - Run `uv run pytest` before committing
-- Maintain test coverage above 55%
+- Maintain test coverage above 55% (configured in `pytest.ini`)
+- Use pytest markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.django`
 
 ## Documentation
 
 - Update docstrings for new functions/classes
 - Update `USAGE.md` if usage patterns change
 - Update `README.md` if installation or setup changes
+
+## Error Handling and Clarity
+
+- When encountering unexpected errors (e.g., `ModuleNotFoundError`, import errors, missing dependencies), investigate and improve project clarity
+- Add documentation or fix configuration issues that cause confusion
+- Update relevant documentation files (README.md, TESTING.md, DEVELOPMENT.md) to prevent similar issues
+- For test-related errors, ensure instructions clearly state prerequisites (e.g., database setup, using `uv run pytest`)

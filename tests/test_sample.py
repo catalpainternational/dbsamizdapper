@@ -117,8 +117,9 @@ def test_create_view(clean_db, fruit_pet_tables):
 
     # After nuke, views should not exist
     cmd_nuke(clean_db)
-    with get_cursor(clean_db) as cursor, pytest.raises(Exception):
-        cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
+    with get_cursor(clean_db) as cursor:
+        with pytest.raises(Exception, match="does not exist|relation.*does not exist"):
+            cursor.execute(f"SELECT * FROM {AnotherThing.db_object_identity()};")
         cursor.fetchall()
 
 

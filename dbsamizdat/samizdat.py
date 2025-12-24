@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import contextlib
-import typing
 from collections import Counter
-from collections.abc import Iterable
 from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
-from typing import Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 from dbsamizdat.samtypes import (
     FQIffable,
@@ -23,7 +20,10 @@ from dbsamizdat.samtypes import (
 
 from .util import nodenamefmt
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
+    import contextlib
+    from collections.abc import Iterable
+
     with contextlib.suppress(ModuleNotFoundError, ImportError):
         from django.db.models import Model, QuerySet
 
@@ -57,12 +57,18 @@ class Samizdat(ProtoSamizdat):
     @classmethod
     def definition_hash(cls):
         """
-        Return the "implanted" hash if preset or generate
-        a new descriptive hash of this instance
-        """
-        if cls.implanted_hash:
-            return cls.implanted_hash
+        Return the "implanted" hash if preset or generate a new descriptive hash.
 
+        Reconstructed classes from the database will have implanted_hash set.
+        For regular classes, computes hash from sql_template and db_object_identity.
+        """
+        implanted = getattr(cls, "implanted_hash", None)
+
+        # Valid implanted_hash must be non-empty and not the string "None"
+        if implanted and implanted not in ("", "None"):
+            return implanted
+
+        # Compute hash from template and identity
         return md5("|".join([cls.get_sql_template(), cls.db_object_identity()]).encode("utf-8")).hexdigest()
 
     @classmethod
@@ -93,6 +99,10 @@ class Samizdat(ProtoSamizdat):
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
+
+        Note: For Option A functions with parameters, if signing fails due to
+        incorrect signature, the executor will query the database to find the
+        actual signature and raise FunctionSignatureError with candidate arguments.
         """
         comment = cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",
@@ -140,6 +150,52 @@ class SamizdatTable(Samizdat):
 
 
 class SamizdatFunction(Samizdat):
+    """Base class for defining PostgreSQL functions.
+
+    There are two approaches for defining functions:
+
+    **Option A: Full CREATE FUNCTION in template**
+        Include the complete `CREATE FUNCTION` statement in your `sql_template`
+        and set `function_arguments_signature = ""`.
+
+    **Option B: Use `${preamble}` (Recommended)**
+        Omit `CREATE FUNCTION` from your `sql_template` and use `${preamble}`,
+        which automatically includes `CREATE FUNCTION {schema}.{name}({signature})`.
+        Set `function_arguments_signature` to your parameter signature
+        (e.g., `"name TEXT, id INT"`).
+
+    Attributes:
+        function_arguments_signature: Parameter signature without parentheses.
+            Defaults to `""` (no parameters). Example: `"name TEXT, age INTEGER"`.
+        function_name: Override the function name. Defaults to the class name.
+            Useful for function polymorphism (multiple functions with same name,
+            different signatures).
+        function_arguments: Full function arguments including defaults, IN/OUT/INOUT,
+            etc. Only needed when call signature differs from full arguments.
+        autorefresher: Flag indicating if this function is auto-generated for
+            materialized view refresh triggers.
+
+    Important:
+        - `creation_identity()` always includes parentheses: `"schema"."name"({args})`
+        - Even when `function_arguments_signature = ""`, it becomes `"schema"."name"()`
+        - Do not include `CREATE FUNCTION` in your template when using `${preamble}`
+          as this causes signature duplication errors.
+
+    For detailed examples and common pitfalls, see USAGE.md.
+
+    Example:
+        >>> class MyFunction(SamizdatFunction):
+        ...     function_arguments_signature = "name TEXT"
+        ...     sql_template = '''
+        ...         ${preamble}
+        ...         RETURNS TEXT AS
+        ...         $BODY$
+        ...         SELECT UPPER(name);
+        ...         $BODY$
+        ...         LANGUAGE SQL;
+        ...     '''
+    """
+
     entity_type = entitypes.FUNCTION
     function_arguments_signature = ""
     autorefresher = False
@@ -404,7 +460,7 @@ class SamizdatQuerySet(Samizdat):
         from django.db import connection  # noqa: F811
 
         with connection.cursor() as c:
-            query = c.mogrify(*queryset.query.sql_with_params())
+            query: bytes | str = c.mogrify(*queryset.query.sql_with_params())
             if isinstance(query, bytes):
                 # Some psycopg2 flavours will give str, others bytes
                 # force consistency
