@@ -381,7 +381,7 @@ def test_function_with_dependencies(clean_db):
 
     # Insert some data
     with get_cursor(clean_db) as cursor:
-        cursor.execute('INSERT INTO "TestTable" (name) VALUES (\'Test1\'), (\'Test2\')')
+        cursor.execute("INSERT INTO \"TestTable\" (name) VALUES ('Test1'), ('Test2')")
 
     # Verify function works
     with get_cursor(clean_db) as cursor:
@@ -436,4 +436,3 @@ def test_definition_hash_consistency():
     # Different functions should have different hashes
     hash3 = FunctionWithParamsOptionB.definition_hash()
     assert hash1 != hash3
-

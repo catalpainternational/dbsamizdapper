@@ -244,7 +244,10 @@ def test_function_preamble_substitution_with_params():
     assert "${preamble}" not in sql
     assert "CREATE FUNCTION" in sql
     # Should include the signature in creation_identity format
-    assert '"public"."TestFunctionWithParams"(name TEXT, age INTEGER)' in sql or '"TestFunctionWithParams"(name TEXT, age INTEGER)' in sql
+    assert (
+        '"public"."TestFunctionWithParams"(name TEXT, age INTEGER)' in sql
+        or '"TestFunctionWithParams"(name TEXT, age INTEGER)' in sql
+    )
 
 
 @pytest.mark.unit
@@ -301,6 +304,7 @@ def test_trigger_function_reference_with_fstring():
 @pytest.mark.unit
 def test_undefined_template_variable_left_unchanged():
     """Test that undefined template variables are left unchanged (safe_substitute behavior)"""
+
     # Create a view with an undefined variable
     class ViewWithUndefinedVar(SamizdatView):
         sql_template = """
@@ -317,6 +321,7 @@ def test_undefined_template_variable_left_unchanged():
 @pytest.mark.unit
 def test_template_variables_in_fstring():
     """Test that template variables work correctly when used in f-strings (double braces)"""
+
     class ViewWithFString(SamizdatView):
         sql_template = """
             ${preamble}
@@ -368,4 +373,3 @@ def test_trigger_preamble_exact_format():
     assert '"TestTrigger"' in create_line
     assert "AFTER INSERT" in create_line
     assert "ON" in create_line
-

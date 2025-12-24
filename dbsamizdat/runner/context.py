@@ -6,17 +6,17 @@ This module handles database connections and transaction management:
 - txi_finalize: Transaction finalization (commit/rollback)
 """
 
-from collections.abc import Generator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from importlib.util import find_spec
-from typing import Literal
+from typing import Any, Literal
 
 from ..samtypes import Cursor
 from .types import ArgType
 
 
 @contextmanager
-def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
+def get_cursor(args: ArgType) -> Iterator[Cursor]:
     """
     Get a database cursor with automatic transaction management.
 
@@ -42,7 +42,7 @@ def get_cursor(args: ArgType) -> Generator[Cursor, None, None]:
         ...     result = cursor.fetchone()
     """
     dburl = getattr(args, "dburl", None)
-    conn = None
+    conn: Any = None  # Connection type varies by driver (psycopg, psycopg2, Django)
 
     if args.in_django:
         from django.db import connections

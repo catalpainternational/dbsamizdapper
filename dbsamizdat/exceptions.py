@@ -165,25 +165,25 @@ class FunctionSignatureError(SamizdatException):
             sd_subject = repr(self.samizdat)
         except Exception:
             sd_subject = f"<samizdat {type(self.samizdat).__name__}>"
-        
+
         try:
             create_sql = sqlfmt(self.samizdat.create())
         except Exception as e:
             create_sql = f"<error generating create SQL: {e}>"
-        
+
         try:
             db_identity = self.samizdat.db_object_identity
         except Exception as e:
             db_identity = f"<error: {e}>"
-        
+
         try:
-            func_args = getattr(self.samizdat, 'function_arguments', None)
+            func_args = getattr(self.samizdat, "function_arguments", None)
             if func_args is None:
-                func_args = getattr(self.samizdat, 'function_arguments_signature', '')
+                func_args = getattr(self.samizdat, "function_arguments_signature", "")
             func_args_str = f"({func_args})"
         except Exception as e:
             func_args_str = f"<error: {e}>"
-        
+
         candidate_args = "\n".join(self.candidate_arguments) if self.candidate_arguments else "<none>"
         args_herald = (
             f"the following candidates:\n{candidate_args}"

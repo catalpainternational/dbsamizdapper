@@ -40,7 +40,7 @@ def cmd_refresh(args: ArgType):
     with get_cursor(args) as cursor:
         # Use None (not []) to allow autodiscovery when samizdatmodules not specified
         samizdatmodules = getattr(args, "samizdatmodules", None)
-        
+
         # Get database state first to filter autodiscovery results
         db_state = list(get_dbstate(cursor))
         # Build set of FQTuples from database state for filtering
@@ -51,24 +51,25 @@ def cmd_refresh(args: ArgType):
                 db_fqs.add(FQTuple(schema=s.schemaname, object_name=s.viewname, args=s.args))
             else:
                 db_fqs.add(FQTuple(schema=s.schemaname, object_name=s.viewname))
-        
+
         # If belownodes is specified, we need the dependency graph even if samizdatmodules=[]
         # Use autodiscovery but filter to only samizdats that exist in the database
         if args.belownodes and samizdatmodules == []:
             # Get all samizdats from autodiscovery (without sanity_check to avoid NameClashError)
-            from ..loader import get_samizdats
             from ..libgraph import depsort_with_sidekicks
-            
+            from ..loader import get_samizdats
+
             all_samizdats = set(get_samizdats())
             # Filter to only those that exist in the database (avoids NameClashError from test classes)
             filtered_samizdats = {sd for sd in all_samizdats if sd.fq() in db_fqs}
             # Now run sanity_check and sorting on the filtered set
             from ..libgraph import sanity_check
+
             sanity_check(filtered_samizdats)
             samizdats = list(depsort_with_sidekicks(filtered_samizdats))
         else:
             samizdats = get_sds(args.in_django, samizdatmodules=samizdatmodules)
-        
+
         matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
@@ -85,9 +86,7 @@ def cmd_refresh(args: ArgType):
 
         # Filter to only materialized views that exist in the database
         # This prevents errors when code defines matviews that haven't been synced
-        db_matviews = {
-            FQTuple.fqify((s.schemaname, s.viewname)) for s in db_state if s.objecttype == "MATVIEW"
-        }
+        db_matviews = {FQTuple.fqify((s.schemaname, s.viewname)) for s in db_state if s.objecttype == "MATVIEW"}
         matviews = [sd for sd in matviews if sd.fq() in db_matviews]
 
         max_namelen = max(len(str(ds)) for ds in matviews) if len(matviews) else 50

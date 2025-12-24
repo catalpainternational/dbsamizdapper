@@ -235,7 +235,7 @@ class ProtoSamizdat(HasFQ, HasGetName, SqlGeneration):
 
     @classmethod
     def db_object_identity(cls) -> str:
-        return cls.fq().db_object_identity()
+        return str(cls.fq().db_object_identity())
 
     @classmethod
     @abstractmethod

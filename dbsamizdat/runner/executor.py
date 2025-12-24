@@ -99,16 +99,17 @@ def executor(
                             (sd.schema, func_name),
                         )
                         candidate_args = [row[0] for row in cursor.fetchall() if row[0]]
-                    
+
                     # If we found exactly one candidate and this is a function with empty signature,
                     # automatically retry with the correct signature
                     if len(candidate_args) == 1 and candidate_args[0] and sd.entity_type.value == "FUNCTION":
                         from ..samtypes import FQTuple
+
                         # Create FQTuple with the correct signature from database
                         correct_fq = FQTuple(
                             schema=sd.schema,
                             object_name=getattr(sd, "function_name", sd.get_name()),
-                            args=candidate_args[0]
+                            args=candidate_args[0],
                         )
                         # Generate the COMMENT statement with the correct signature
                         comment_sql = cursor.mogrify(

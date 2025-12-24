@@ -99,7 +99,7 @@ class Samizdat(ProtoSamizdat):
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
-        
+
         Note: For Option A functions with parameters, if signing fails due to
         incorrect signature, the executor will query the database to find the
         actual signature and raise FunctionSignatureError with candidate arguments.
@@ -460,7 +460,7 @@ class SamizdatQuerySet(Samizdat):
         from django.db import connection  # noqa: F811
 
         with connection.cursor() as c:
-            query = c.mogrify(*queryset.query.sql_with_params())
+            query: bytes | str = c.mogrify(*queryset.query.sql_with_params())
             if isinstance(query, bytes):
                 # Some psycopg2 flavours will give str, others bytes
                 # force consistency

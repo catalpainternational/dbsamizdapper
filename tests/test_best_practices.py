@@ -19,6 +19,7 @@ from dbsamizdat.samizdat import (
 
 class SimpleFunction(SamizdatFunction):
     """Function with no parameters - Pattern 1 from USAGE.md"""
+
     function_arguments_signature = ""  # No parameters
     sql_template = """
         ${preamble}
@@ -59,6 +60,7 @@ def test_pattern1_simple_function_creation(clean_db):
 
 class GreetFunction(SamizdatFunction):
     """Function with parameters - Pattern 2 from USAGE.md"""
+
     function_arguments_signature = "name TEXT, age INTEGER"
     sql_template = """
         ${preamble}
@@ -108,6 +110,7 @@ def test_pattern2_function_with_params_creation(clean_db):
 
 class MyTable(SamizdatTable):
     """Table for trigger example - Pattern 3 from USAGE.md"""
+
     sql_template = """
         ${preamble}
         (
@@ -121,6 +124,7 @@ class MyTable(SamizdatTable):
 
 class UpdateTimestampFunction(SamizdatFunction):
     """Function that updates timestamp - Pattern 3 from USAGE.md"""
+
     function_arguments_signature = ""
     sql_template = """
         ${preamble}
@@ -137,6 +141,7 @@ class UpdateTimestampFunction(SamizdatFunction):
 
 class UpdateTimestampTrigger(SamizdatTrigger):
     """Trigger that calls the update timestamp function - Pattern 3 from USAGE.md"""
+
     on_table = MyTable  # Can be class, tuple, or string
     condition = "BEFORE UPDATE"
     deps_on = {UpdateTimestampFunction}  # Include function in dependencies
@@ -187,6 +192,7 @@ def test_pattern3_trigger_functionality(clean_db):
     # Update in a separate transaction so NOW() will return a different value
     # (NOW() returns transaction start time, so we need a new transaction)
     import time
+
     time.sleep(0.1)  # Small delay to ensure different transaction start time
 
     with get_cursor(clean_db) as cursor:
@@ -221,6 +227,7 @@ def test_pattern3_trigger_functionality(clean_db):
 @pytest.mark.unit
 def test_pattern3_trigger_on_table_formats():
     """Test Pattern 3: Trigger accepts different on_table formats"""
+
     # Test with tuple
     class TriggerWithTuple(SamizdatTrigger):
         on_table = ("public", "test_table")
@@ -243,6 +250,7 @@ def test_pattern3_trigger_on_table_formats():
 
 class MultiFunctionTable(SamizdatTable):
     """Table for multi-function example - Pattern 4 from USAGE.md"""
+
     sql_template = """
         ${preamble}
         (
@@ -256,6 +264,7 @@ class MultiFunctionTable(SamizdatTable):
 
 class ValidateNameFunction(SamizdatFunction):
     """Function to validate name - Pattern 4 from USAGE.md"""
+
     function_arguments_signature = "name_value TEXT"
     sql_template = """
         ${preamble}
@@ -271,6 +280,7 @@ class ValidateNameFunction(SamizdatFunction):
 
 class LogChangeFunction(SamizdatFunction):
     """Function to log changes - Pattern 4 from USAGE.md"""
+
     function_arguments_signature = ""
     sql_template = """
         ${preamble}
@@ -288,6 +298,7 @@ class LogChangeFunction(SamizdatFunction):
 
 class ValidateAndLogTrigger(SamizdatTrigger):
     """Trigger that uses multiple functions - Pattern 4 from USAGE.md"""
+
     on_table = MultiFunctionTable
     condition = "BEFORE INSERT OR UPDATE"
     deps_on = {ValidateNameFunction, LogChangeFunction}  # Multiple function dependencies
@@ -396,6 +407,7 @@ def test_pattern4_multi_function_trigger_functionality(clean_db):
 @pytest.mark.unit
 def test_function_checklist_uses_samizdatname():
     """Verify function checklist: Use ${samizdatname} placeholder"""
+
     class FunctionWithSamizdatName(SamizdatFunction):
         function_arguments_signature = ""
         sql_template = """
@@ -415,6 +427,7 @@ def test_function_checklist_uses_samizdatname():
 @pytest.mark.unit
 def test_function_checklist_uses_body_tag():
     """Verify function checklist: Use $BODY$ or $FUNC$ instead of $$"""
+
     class FunctionWithBodyTag(SamizdatFunction):
         function_arguments_signature = ""
         sql_template = """
@@ -434,6 +447,7 @@ def test_function_checklist_uses_body_tag():
 @pytest.mark.unit
 def test_trigger_checklist_starts_with_preamble():
     """Verify trigger checklist: Start template with ${preamble}"""
+
     class ChecklistTrigger(SamizdatTrigger):
         on_table = ("public", "test_table")
         condition = "AFTER INSERT"
@@ -452,6 +466,7 @@ def test_trigger_checklist_starts_with_preamble():
 @pytest.mark.unit
 def test_trigger_checklist_uses_creation_identity():
     """Verify trigger checklist: Use FunctionClass.creation_identity()"""
+
     class TestFunction(SamizdatFunction):
         function_arguments_signature = "x INTEGER"
         sql_template = """
@@ -477,6 +492,7 @@ def test_trigger_checklist_uses_creation_identity():
 @pytest.mark.unit
 def test_trigger_checklist_includes_deps_on():
     """Verify trigger checklist: Include function class in deps_on set"""
+
     class TestFunction(SamizdatFunction):
         function_arguments_signature = ""
         sql_template = """
@@ -503,6 +519,7 @@ def test_trigger_checklist_includes_deps_on():
 @pytest.mark.unit
 def test_common_mistake_dollar_quoting():
     """Verify common mistake: Don't use $$, use $BODY$ instead"""
+
     # This test documents the correct approach
     class CorrectFunction(SamizdatFunction):
         function_arguments_signature = ""
@@ -522,6 +539,7 @@ def test_common_mistake_dollar_quoting():
 @pytest.mark.unit
 def test_common_mistake_hardcoded_names():
     """Verify common mistake: Don't hardcode names, use ${samizdatname}"""
+
     class FunctionWithSamizdatName(SamizdatFunction):
         function_arguments_signature = ""
         sql_template = """
@@ -541,6 +559,7 @@ def test_common_mistake_hardcoded_names():
 @pytest.mark.unit
 def test_common_mistake_template_variables_in_triggers():
     """Verify common mistake: Don't use template variables for function refs in triggers"""
+
     class TestFunction(SamizdatFunction):
         function_arguments_signature = ""
         sql_template = """
