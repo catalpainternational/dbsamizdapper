@@ -84,6 +84,9 @@ def executor(
                     # If not found and this is a function, query pg_proc directly
                     # (for functions that were just created but not yet signed)
                     if not candidate_args and sd.entity_type.value == "FUNCTION":
+                        func_name = getattr(sd, "function_name", sd.get_name())
+                        # Query for functions matching schema and name
+                        # Note: PostgreSQL stores function names exactly as created (case-sensitive if quoted)
                         cursor.execute(
                             """
                             SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
@@ -93,7 +96,7 @@ def executor(
                               AND p.proname = %s
                               AND p.prokind NOT IN ('a', 'w', 'p')
                             """,
-                            (sd.schema, getattr(sd, "function_name", sd.get_name())),
+                            (sd.schema, func_name),
                         )
                         candidate_args = [row[0] for row in cursor.fetchall() if row[0]]
                     
