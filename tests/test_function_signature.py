@@ -90,7 +90,9 @@ class SimpleFunctionOptionA(SamizdatFunction):
 class FunctionWithParamsOptionA(SamizdatFunction):
     """Function with parameters using Option A (full CREATE FUNCTION)"""
 
-    function_arguments_signature = ""
+    # Set function_arguments_signature for signing purposes, even though
+    # the full CREATE FUNCTION is in the template
+    function_arguments_signature = "name TEXT, age INTEGER"
 
     @classmethod
     def sql_template(cls):

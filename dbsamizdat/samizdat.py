@@ -99,6 +99,10 @@ class Samizdat(ProtoSamizdat):
         """
         Generate COMMENT ON sql storing a signature
         We need the cursor to let psycopg (2) properly escape our json-as-text-string.
+        
+        Note: For Option A functions with parameters, if signing fails due to
+        incorrect signature, the executor will query the database to find the
+        actual signature and raise FunctionSignatureError with candidate arguments.
         """
         comment = cursor.mogrify(
             f"""COMMENT ON {cls.entity_type.value} {cls.db_object_identity()} IS %s;""",

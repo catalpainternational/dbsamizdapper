@@ -236,6 +236,7 @@ def django_setup():
                 INSTALLED_APPS=[
                     "django.contrib.contenttypes",
                     "dbsamizdat",
+                    "sample_app",  # Include sample_app for autodiscovery tests
                 ],
                 USE_TZ=True,
             )
