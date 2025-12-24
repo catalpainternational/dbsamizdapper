@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from dbsamizdat.exceptions import NameClashError
 from dbsamizdat.loader import samizdats_in_module
 from dbsamizdat.runner import ArgType, get_sds
 from dbsamizdat.runner.helpers import import_samizdat_modules

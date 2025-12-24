@@ -188,4 +188,27 @@ clean:
     find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
     find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
+# Lint with ruff
+lint:
+    uv run ruff check .
 
+# Check code formatting with ruff
+format-check:
+    uv run ruff format --check .
+
+# Format code with ruff (apply fixes)
+format:
+    uv run ruff format .
+
+# Type check with mypy
+typecheck:
+    uv run mypy dbsamizdat
+
+# Run all CI checks (lint, format, typecheck) - matches GitHub Actions
+ci: lint format-check typecheck
+    @echo "✅ All CI checks passed!"
+
+# Fix linting issues automatically
+fix:
+    uv run ruff check --fix .
+    uv run ruff format .
