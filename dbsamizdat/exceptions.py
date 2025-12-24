@@ -179,7 +179,7 @@ class FunctionSignatureError(SamizdatException):
             {self.samizdat.db_object_identity}
 
             because, we figure, that is not actually the effective call signature resulting from the function arguments, which are:
-            "({self.samizdat.function_arguments})"
+            "({getattr(self.samizdat, 'function_arguments', getattr(self.samizdat, 'function_arguments_signature', ''))})"
 
             We queried the database to find out what the effective call argument signature should be instead, and came up with:
             {args_herald}
