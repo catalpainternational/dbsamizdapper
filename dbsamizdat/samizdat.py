@@ -113,30 +113,33 @@ class Samizdat(ProtoSamizdat):
             if isinstance(comment, bytes):
                 return comment.decode()
             return comment
-        except Exception:
+        except Exception as e:
             # If that fails and this is a function with empty function_arguments_signature,
             # try to find the actual signature from the database
             if cls.entity_type == entitypes.FUNCTION and not cls.function_arguments_signature:
-                from ..libdb import get_dbstate
-                
-                # Query database for functions with this name
-                db_functions = [
-                    state for state in get_dbstate(cursor)
-                    if state.schemaname == cls.schema
-                    and state.viewname == cls.get_name()
-                    and state.objecttype == "FUNCTION"
-                ]
+                # Query pg_proc directly to find functions by name (don't filter by comment)
+                # since the function was just created and may not be signed yet
+                cursor.execute(
+                    """
+                    SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
+                    FROM pg_catalog.pg_proc p
+                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+                    WHERE n.nspname = %s
+                      AND p.proname = %s
+                      AND p.prokind NOT IN ('a', 'w', 'p')
+                    """,
+                    (cls.schema, cls.get_name()),
+                )
+                results = cursor.fetchall()
                 
                 # If we found exactly one match, use its signature
-                if len(db_functions) == 1 and db_functions[0].args:
-                    # Temporarily use the database signature for signing
-                    original_fq = cls.fq()
+                if len(results) == 1 and results[0][0]:
                     # Create a temporary FQTuple with the correct signature
                     from ..samtypes import FQTuple
                     temp_fq = FQTuple(
                         schema=cls.schema,
                         object_name=cls.get_name(),
-                        args=db_functions[0].args
+                        args=results[0][0]
                     )
                     # Use the correct signature for the COMMENT statement
                     comment = cursor.mogrify(
