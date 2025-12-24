@@ -39,7 +39,12 @@ def cmd_refresh(args: ArgType):
     """
     with get_cursor(args) as cursor:
         # Use None (not []) to allow autodiscovery when samizdatmodules not specified
-        samizdats = get_sds(args.in_django, samizdatmodules=getattr(args, "samizdatmodules", None))
+        samizdatmodules = getattr(args, "samizdatmodules", None)
+        # If belownodes is specified, we need the dependency graph even if samizdatmodules=[]
+        # So use autodiscovery in that case
+        if args.belownodes and samizdatmodules == []:
+            samizdatmodules = None
+        samizdats = get_sds(args.in_django, samizdatmodules=samizdatmodules)
         matviews = [sd for sd in samizdats if sd_is_matview(sd)]
 
         if args.belownodes:
