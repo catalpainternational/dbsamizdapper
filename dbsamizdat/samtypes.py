@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable  # noqa: TC003
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Protocol
@@ -84,19 +84,21 @@ class FQTuple:
             if len(arg) == 3:
                 return cls(schema=arg[0], object_name=arg[1], args=arg[2])
 
-        elif hasattr(arg, "fq"):
+            # If tuple length is not 1, 2, or 3, raise error
+            raise ValueError(f"Tuple must have 1, 2, or 3 elements, got {len(arg)}")
+
+        if hasattr(arg, "fq"):
             """
             Convert a Samizdat like instance
             """
             return arg.fq()
 
-        elif hasattr(arg, "_meta"):
+        if hasattr(arg, "_meta"):
             # If a django-like instance with a `_meta` prop is provided
             # use its db_table to determine a fully qualified name
             return cls.fqify(arg._meta.db_table)
 
-        else:
-            raise TypeError
+        raise TypeError
 
 
 type objectname = str

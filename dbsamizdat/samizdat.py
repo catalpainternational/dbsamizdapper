@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import contextlib
-import typing
 from collections import Counter
-from collections.abc import Iterable
 from hashlib import md5
 from json import dumps as jsondumps
 from string import Template
 from time import time as now
-from typing import Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 from dbsamizdat.samtypes import (
     FQIffable,
@@ -23,7 +20,10 @@ from dbsamizdat.samtypes import (
 
 from .util import nodenamefmt
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
+    import contextlib
+    from collections.abc import Iterable
+
     with contextlib.suppress(ModuleNotFoundError, ImportError):
         from django.db.models import Model, QuerySet
 
