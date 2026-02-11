@@ -86,9 +86,15 @@ def samizdats_in_app(app_name: str):
     """
     Returns the samizdat instances in a given app_name
     """
-    if find_spec(f"{app_name}.{AUTOLOAD_MODULENAME}"):
-        module = import_module(f"{app_name}.{AUTOLOAD_MODULENAME}")
-        yield from samizdats_in_module(module)
+    module_name = f"{app_name}.{AUTOLOAD_MODULENAME}"
+    if find_spec(module_name):
+        try:
+            module = import_module(module_name)
+            yield from samizdats_in_module(module)
+        except ImportError as e:
+            logger.warning(f"Failed to import {module_name}: {e}")
+        except Exception as e:
+            logger.warning(f"Error loading samizdats from {module_name}: {e}")
 
 
 def autodiscover_samizdats():
@@ -99,7 +105,14 @@ def autodiscover_samizdats():
     Yields:
         SamizType: Samizdat classes found in apps and DBSAMIZDAT_MODULES
     """
-    from django.conf import settings
+    try:
+        from django.conf import settings
+        if not settings.configured:
+            logger.warning("Django settings not configured, skipping autodiscovery")
+            return
+    except ImportError:
+        logger.warning("Django not available, skipping autodiscovery")
+        return
 
     # First, discover from installed apps
     for app in settings.INSTALLED_APPS:
@@ -108,5 +121,10 @@ def autodiscover_samizdats():
     # Then, include modules from DBSAMIZDAT_MODULES setting
     django_sdmodules = getattr(settings, "DBSAMIZDAT_MODULES", [])
     for sdmod in django_sdmodules:
-        module = import_module(sdmod)
-        yield from samizdats_in_module(module)
+        try:
+            module = import_module(sdmod)
+            yield from samizdats_in_module(module)
+        except ImportError as e:
+            logger.warning(f"Failed to import DBSAMIZDAT_MODULES entry {sdmod}: {e}")
+        except Exception as e:
+            logger.warning(f"Error loading samizdats from DBSAMIZDAT_MODULES entry {sdmod}: {e}")
