@@ -1,4 +1,5 @@
 import inspect
+import sys
 from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
@@ -87,21 +88,14 @@ def samizdats_in_app(app_name: str):
     Returns the samizdat instances in a given app_name
     """
     module_name = f"{app_name}.{AUTOLOAD_MODULENAME}"
-    spec = find_spec(module_name)
-    if spec:
+    if find_spec(module_name):
         try:
             module = import_module(module_name)
-            samizdats = list(samizdats_in_module(module))
-            if samizdats:
-                yield from samizdats
-            else:
-                logger.warning(f"Module {module_name} found but contains no valid Samizdat classes")
+            yield from samizdats_in_module(module)
         except ImportError as e:
             logger.warning(f"Failed to import {module_name}: {e}")
         except Exception as e:
             logger.warning(f"Error loading samizdats from {module_name}: {e}")
-    else:
-        logger.warning(f"Module {module_name} not found by find_spec")
 
 
 def autodiscover_samizdats():
@@ -121,35 +115,17 @@ def autodiscover_samizdats():
         logger.warning("Django not available, skipping autodiscovery")
         return
 
-    logger.warning(f"Starting autodiscovery with INSTALLED_APPS: {settings.INSTALLED_APPS}")
-
     # First, discover from installed apps
-    total_found = 0
     for app in settings.INSTALLED_APPS:
-        app_samizdats = list(samizdats_in_app(app))
-        if app_samizdats:
-            logger.warning(f"Found {len(app_samizdats)} samizdats in app {app}: {[str(s) for s in app_samizdats]}")
-            total_found += len(app_samizdats)
-            yield from app_samizdats
-        else:
-            logger.warning(f"No samizdats found in app {app}")
-
-    logger.warning(f"Total samizdats found from apps: {total_found}")
+        yield from samizdats_in_app(app)
 
     # Then, include modules from DBSAMIZDAT_MODULES setting
     django_sdmodules = getattr(settings, "DBSAMIZDAT_MODULES", [])
-    if django_sdmodules:
-        logger.warning(f"Checking DBSAMIZDAT_MODULES: {django_sdmodules}")
-        for sdmod in django_sdmodules:
-            try:
-                module = import_module(sdmod)
-                module_samizdats = list(samizdats_in_module(module))
-                if module_samizdats:
-                    logger.warning(f"Found {len(module_samizdats)} samizdats in module {sdmod}: {[str(s) for s in module_samizdats]}")
-                    yield from module_samizdats
-                else:
-                    logger.warning(f"No samizdats found in DBSAMIZDAT_MODULES entry {sdmod}")
-            except ImportError as e:
-                logger.warning(f"Failed to import DBSAMIZDAT_MODULES entry {sdmod}: {e}")
-            except Exception as e:
-                logger.warning(f"Error loading samizdats from DBSAMIZDAT_MODULES entry {sdmod}: {e}")
+    for sdmod in django_sdmodules:
+        try:
+            module = import_module(sdmod)
+            yield from samizdats_in_module(module)
+        except ImportError as e:
+            logger.warning(f"Failed to import DBSAMIZDAT_MODULES entry {sdmod}: {e}")
+        except Exception as e:
+            logger.warning(f"Error loading samizdats from DBSAMIZDAT_MODULES entry {sdmod}: {e}")
