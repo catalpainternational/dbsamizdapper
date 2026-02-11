@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Module discovery bug: CLI now properly imports modules specified via `samizdatmodules` argument instead of relying on manual imports
 - Autodiscovery robustness: Added error handling for Django availability and module import failures to prevent silent failures when discovering `dbsamizdat_defs` files
-- Empty samizdatmodules parameter: Fixed `get_sds()` to treat empty `samizdatmodules` list as "not specified", allowing autodiscovery to run instead of returning empty results
+- Sync command autodiscovery: Fixed `cmd_sync` to properly fall back to autodiscovery when no explicit samizdat classes are provided and `samizdatmodules` is empty
 - GraphViz dot() now correctly handles TABLE entity types (was missing from styles dictionary)
 - GraphViz dot() now handles empty samizdat lists without IndexError when accessing `topsorted[-1]`
 - cmd_refresh now filters to only refresh materialized views that exist in the database, preventing errors when code defines matviews that haven't been synced

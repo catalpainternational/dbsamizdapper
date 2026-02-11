@@ -118,7 +118,7 @@ def cmd_sync(args: ArgType, samizdatsIn: list[SamizType] | None = None):
     """
     samizdatmodules = getattr(args, "samizdatmodules", None) or []
     samizdats = tuple(get_sds(False, samizdatsIn, samizdatmodules)) or tuple(
-        get_sds(args.in_django, samizdatmodules=samizdatmodules)
+        get_sds(args.in_django, samizdatmodules=None if samizdatmodules == [] else samizdatmodules)
     )
 
     with get_cursor(args) as cursor:
