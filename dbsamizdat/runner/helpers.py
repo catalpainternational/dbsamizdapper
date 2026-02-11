@@ -99,8 +99,7 @@ def get_sds(
     Samizdats may be defined by:
     - An explicit list (samizdats parameter) - takes highest precedence
     - Module names (samizdatmodules parameter) - imports modules and discovers classes
-    - Autodiscovery (default when not in Django) - finds all imported subclasses
-    - Django module search (when in_django=True) - searches Django apps
+    - Autodiscovery (default) - finds all imported subclasses or Django apps
 
     Args:
         in_django: Whether to use Django autodiscovery
@@ -120,6 +119,7 @@ def get_sds(
     Note:
         Runs sanity_check twice: before and after sorting.
         Includes auto-generated sidekicks (triggers, functions).
+        Empty samizdatmodules list falls back to autodiscovery.
 
     Example:
         >>> # Using explicit classes
@@ -128,16 +128,15 @@ def get_sds(
         >>> # Using module names
         >>> samizdats = get_sds(samizdatmodules=["myapp.views", "myapp.models"])
 
-        >>> # Using autodiscovery (finds all imported subclasses)
+        >>> # Using autodiscovery (finds all imported subclasses or Django apps)
         >>> samizdats = get_sds()
     """
     if samizdats:
         # Explicit list takes highest precedence
         sds = set(samizdats)
-    elif samizdatmodules is not None:
+    elif samizdatmodules:
         # Import modules and discover samizdats within them
-        # Note: Empty list means "no modules" (returns empty set)
-        # None means "not specified" (falls through to autodiscovery)
+        # Note: Empty list or None means "not specified" (falls through to autodiscovery)
         modules = import_samizdat_modules(samizdatmodules)
         sds = set()
         for module in modules:
