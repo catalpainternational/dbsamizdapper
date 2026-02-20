@@ -1,6 +1,6 @@
 [project]
 name = "dbsamizdapper"
-version = "0.1.1"
+version = "0.2.0"
 description = "Blissfully naive PostgreSQL database object manager for views, materialized views, functions, and triggers"
 authors = [{name = "Josh Brooks", email = "josh@catalpa.io"}]
 maintainers = [{name = "Josh Brooks", email = "josh@catalpa.io"}]
