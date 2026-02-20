@@ -1,5 +1,4 @@
 import inspect
-import sys
 from collections.abc import Iterable
 from importlib import import_module
 from importlib.util import find_spec
@@ -108,6 +107,7 @@ def autodiscover_samizdats():
     """
     try:
         from django.conf import settings
+
         if not settings.configured:
             logger.warning("Django settings not configured, skipping autodiscovery")
             return
