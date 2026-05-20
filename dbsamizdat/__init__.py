@@ -1,5 +1,6 @@
 from .samizdat import (
     SamizdatFunction,  # noqa: F401
+    SamizdatIndex,  # noqa: F401
     SamizdatMaterializedModel,  # noqa: F401
     SamizdatMaterializedQuerySet,  # noqa: F401
     SamizdatMaterializedView,  # noqa: F401

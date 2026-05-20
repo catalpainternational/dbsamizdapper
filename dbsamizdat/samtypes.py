@@ -29,6 +29,7 @@ class entitypes(Enum):
     MATVIEW = "MATERIALIZED VIEW"
     FUNCTION = "FUNCTION"
     TRIGGER = "TRIGGER"
+    INDEX = "INDEX"
 
 
 class HasFQ(ABC):

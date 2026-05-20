@@ -342,6 +342,56 @@ class SamizdatTrigger(Samizdat):
         )
 
 
+class SamizdatIndex(Samizdat):
+    """
+    Database index samizdat. Inherits its schema from the parent table or matview.
+
+    The sql_template body provides the column list and any WHERE predicate,
+    e.g. ``${preamble} (col_a, col_b) WHERE col_c IS NOT NULL;``.
+    """
+
+    entity_type = entitypes.INDEX
+    on_table: str | FQIffable
+    unique: bool = False
+    method: str = "btree"
+
+    @classmethod
+    def fq(cls):
+        return FQTuple(
+            schema=FQTuple.fqify(cls.on_table).schema,
+            object_name=cls.get_name(),
+        )
+
+    @classmethod
+    def fqdeps_on_unmanaged(cls):
+        return {FQTuple.fqify(n) for n in cls.deps_on_unmanaged | {cls.on_table}}
+
+    @classmethod
+    def create(cls):
+        target = FQTuple.fqify(cls.on_table).db_object_identity()
+        unique = "UNIQUE " if cls.unique else ""
+        # Index name is unqualified in CREATE INDEX (schema follows the table).
+        name = f'"{cls.get_name()}"'
+        subst = {
+            "preamble": f"CREATE {unique}INDEX {name} ON {target} USING {cls.method}",
+            "samizdatname": cls.db_object_identity(),
+        }
+        return Template(cls.get_sql_template()).safe_substitute(subst)
+
+    @classmethod
+    def head_id(cls):
+        on_table_fq = FQTuple.fqify(cls.on_table)
+        return hash(
+            (
+                on_table_fq.schema,
+                cls.get_name(),
+                cls.entity_type.name,
+                on_table_fq.object_name,
+                cls.definition_hash(),
+            )
+        )
+
+
 class SamizdatWithSidekicks(Samizdat, HasSidekicks, HasRefreshTriggers):
     """
     This class is here for mypy detection of sidekicks function
@@ -354,6 +404,7 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
     entity_type = entitypes.MATVIEW
     refresh_concurrently = False
     refresh_triggers = set()
+    refresh_unique_columns: tuple[str, ...] = ()
     AUTOREFRESHER_COUNTER = "autorefresher"
 
     @classmethod
@@ -422,11 +473,34 @@ class SamizdatMaterializedView(SamizdatWithSidekicks):
                 )
 
     @classmethod
-    def sidekicks(cls) -> Iterable[SamizdatFunction | SamizdatTrigger]:
+    def gen_refresh_unique_index(cls):
         """
-        Yields "functions" and "triggers"
+        Yields a unique SamizdatIndex required by REFRESH MATERIALIZED VIEW CONCURRENTLY.
+        Only emitted when both refresh_concurrently and refresh_unique_columns are set.
+        """
+        if not (cls.refresh_concurrently and cls.refresh_unique_columns):
+            return
+        cols = ", ".join(f'"{c}"' for c in cls.refresh_unique_columns)
+        yield type(
+            f"{cls.get_name()}_uidx",
+            (SamizdatIndex,),
+            {
+                "schema": cls.schema,
+                "on_table": cls,
+                "unique": True,
+                "deps_on": {cls},
+                "sql_template": f"${{preamble}} ({cols});",
+            },
+        )
+
+    @classmethod
+    def sidekicks(cls) -> Iterable[SamizdatFunction | SamizdatTrigger | SamizdatIndex]:
+        """
+        Yields "functions", "triggers", and "indexes"
         to help manage this Materialized View
         """
+        yield from cls.gen_refresh_unique_index()
+
         if not cls.refresh_triggers:
             return
 
@@ -535,3 +609,7 @@ def sd_is_function(sd: Any) -> TypeGuard[SamizdatFunction]:
 
 def sd_is_trigger(sd: Any) -> TypeGuard[SamizdatTrigger]:
     return getattr(sd, "entity_type", None) == entitypes.TRIGGER
+
+
+def sd_is_index(sd: Any) -> TypeGuard[SamizdatIndex]:
+    return getattr(sd, "entity_type", None) == entitypes.INDEX
