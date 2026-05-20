@@ -173,7 +173,6 @@ def test_get_sds_with_explicit_list(test_samizdats):
     assert result[1].__name__ == "TestView"
 
 
-@pytest.mark.skip(reason="Empty list triggers autodiscovery which finds test classes with name clashes")
 @pytest.mark.unit
 def test_get_sds_with_explicit_empty_list():
     """Test get_sds with empty list"""

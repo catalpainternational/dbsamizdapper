@@ -82,7 +82,7 @@ stop-db:
     fi
 
 # Run all tests in a containerized environment
-test:
+test *args:
     #!/usr/bin/env bash
     set -e
     if ! command -v podman > /dev/null; then
@@ -145,20 +145,20 @@ test:
     echo "Syncing dependencies with all extras..."
     uv sync --group dev --group testing --extra django --extra psycopg3
     echo "Running tests..."
-    uv run pytest
+    uv run pytest {{args}}
     echo "Tests completed. Tearing down container..."
     podman stop dbsamizdapper-postgres > /dev/null 2>&1 || true
     podman rm dbsamizdapper-postgres > /dev/null 2>&1 || true
 
 # Run tests without starting/stopping container (assumes DB is already running)
-test-only:
+test-only *args:
     #!/usr/bin/env bash
     set -e
     export DB_PORT={{POSTGRES_PORT}}
     echo "Syncing dependencies with all extras..."
     uv sync --group dev --group testing --extra django --extra psycopg3
     echo "Running tests..."
-    uv run pytest
+    uv run pytest {{args}}
 
 # Run unit tests only (no database required)
 test-unit:
