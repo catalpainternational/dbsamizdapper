@@ -131,7 +131,7 @@ def get_sds(
         >>> # Using autodiscovery (finds all imported subclasses)
         >>> samizdats = get_sds()
     """
-    if samizdats:
+    if samizdats is not None:
         # Explicit list takes highest precedence
         sds = set(samizdats)
     elif samizdatmodules is not None:

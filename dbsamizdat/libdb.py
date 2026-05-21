@@ -7,7 +7,14 @@ from typing import NamedTuple
 from dbsamizdat.loader import SamizType, filter_sds
 from dbsamizdat.samizdat import Samizdat
 
-from . import SamizdatFunction, SamizdatMaterializedView, SamizdatTable, SamizdatTrigger, SamizdatView
+from . import (
+    SamizdatFunction,
+    SamizdatIndex,
+    SamizdatMaterializedView,
+    SamizdatTable,
+    SamizdatTrigger,
+    SamizdatView,
+)
 from .samtypes import Cursor, entitypes
 
 COMMENT_MAGIC = """{"dbsamizdat": {"version":"""
@@ -115,6 +122,23 @@ def get_dbstate(
             WHERE
                 pt.tgisinternal = False
             """,
+        entitypes.INDEX: """
+            SELECT
+                n.nspname AS schemaname,
+                ic.relname AS indexname,
+                'INDEX' AS objecttype,
+                pg_catalog.obj_description(ic.oid, 'pg_class') AS commentcontent,
+                tc.relname AS args,
+                NULL AS definition_hash
+            FROM pg_catalog.pg_index i
+            JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid
+            JOIN pg_catalog.pg_namespace n ON n.oid = ic.relnamespace
+            JOIN pg_catalog.pg_class tc ON tc.oid = i.indrelid
+            WHERE ic.relkind = 'i'
+                AND n.nspname <> 'pg_catalog'
+                AND n.nspname <> 'information_schema'
+                AND n.nspname !~ '^pg_toast'
+            """,
     }
 
     for fetch_query in fetches.values():
@@ -147,6 +171,7 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
             SamizdatTable,
             SamizdatFunction,
             SamizdatTrigger,
+            SamizdatIndex,
         )
     }
 
@@ -167,6 +192,13 @@ def dbinfo_to_class(info: StateTuple) -> type[Samizdat]:
         classfields.update(
             {
                 "schema": None,
+                "on_table": (info.schemaname, table),
+            }
+        )
+    elif entity_type == entitypes.INDEX:
+        table = str(info.args)
+        classfields.update(
+            {
                 "on_table": (info.schemaname, table),
             }
         )

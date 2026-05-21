@@ -233,7 +233,6 @@ def test_self_reference_raises(clean_db):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.skip(reason="Refresh trigger execution hangs - trigger mechanism needs debugging")
 def test_sidekicks(clean_db, refresh_trigger_tables):
     """Test that materialized views with refresh_triggers create sidekicks"""
 
@@ -242,7 +241,7 @@ def test_sidekicks(clean_db, refresh_trigger_tables):
         refresh_triggers = {"d", "d2"}
         sql_template = """
             ${preamble}
-            SELECT * FROM d UNION SELECT * FROM d2
+            SELECT * FROM d UNION ALL SELECT * FROM d2
             ${postamble};
         """
 
